@@ -38,6 +38,7 @@
                     <i class="fas fa-book-bible text-xl mr-2"></i>
                     <a href="{{ route('reading-plans.index') }}" class="text-xl font-bold">Reading Plans</a>
                 </div>
+                
                     <div class="flex items-center">
                         <a href="#" class="p-2 rounded hover:bg-blue-700">
                             <i class="fas fa-bell mr-1"></i>

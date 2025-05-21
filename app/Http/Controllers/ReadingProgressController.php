@@ -63,7 +63,7 @@ class ReadingProgressController extends Controller
         return BibleChapter::getChaptersForDay($nextDay, $testament);
     }
 
-    public function view()
+    public function view($request)
 {
     /*
     $user = auth()->user();
@@ -119,13 +119,5 @@ public function getReadingPlans()
     return view('reading.plans', compact('readingPlans'));
 }
 
-public function index()
-{
-    $user = Auth::user();
-    $readingPlans = $user->readingPlans;
-    
-    return view('reading-progress.index', [
-        'readingPlans' => $readingPlans
-    ]);
-    return view ('reading-plans.index');
+
 }

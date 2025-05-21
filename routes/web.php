@@ -1,10 +1,15 @@
 <?php
 
+use Admin\UserController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ReadingPlanController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\ReadingProgressController;
+use App\Http\Controllers\ReadingPlanController;
+use App\Http\Controllers\Admin\AdminReadingPlanController;
+use App\Http\Middleware\Admin;
 
 Route::get('/', function () {
     return view('welcome');
@@ -30,4 +35,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/reading-plans/{readingPlan}/leave', [ReadingPlanController::class, 'leave'])->name('reading-plans.leave');
     
 });
+// Admin routes
+Route::middleware(['auth', \App\Http\Middleware\Admin::class])->prefix('admin')->name('admin.')->group(function () {
+    // Admin dashboard
+Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+    // User management
+    Route::resource('users', AdminUserController::class);
+    
+    // Reading plan management
+    Route::resource('reading-plans', AdminReadingPlanController::class);
+});
+
 require __DIR__.'/auth.php';

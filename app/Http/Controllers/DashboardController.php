@@ -115,4 +115,12 @@ class DashboardController extends Controller
             'totalProgress' => $user->getProgressPercentage()
         ];
     }
+
+    public function manageHierarchy()
+    {
+        $user = auth()->user();
+        $hierarchyData = $this->getHierarchyData($user);
+
+        return view('admin.hierarchy.manage-hierarchy', compact('hierarchyData'));
+    }
 }

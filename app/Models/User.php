@@ -83,7 +83,16 @@ class User extends Authenticatable
                     ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
                     ->withTimestamps();
     }
-    
+    /**
+     * Check if the user is an admin.
+     *
+     * @return bool
+     */
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
     public function isLeader()
     {
         return in_array($this->role, ['clan_leader', 'platoon_leader', 'squad_leader', 'batch_leader', 'team_leader']);
@@ -95,14 +104,13 @@ class User extends Authenticatable
     }
     
     public function canManageHierarchy()
-{
-    return in_array($this->role, [
-        'clan_leader',
-        'platoon_leader',
-        'squad_leader',
-        'batch_leader',
-        'team_leader'
-    ]);
-}
-
+    {
+        return in_array($this->role, [
+            'clan_leader',
+            'platoon_leader',
+            'squad_leader',
+            'batch_leader',
+            'team_leader'
+        ]) || $this->isAdmin();
+    }
 }
