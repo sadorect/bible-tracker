@@ -33,6 +33,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reading-plans/{readingPlan}', [ReadingPlanController::class, 'show'])->name('reading-plans.show');
     Route::post('/reading-plans/{readingPlan}/join', [ReadingPlanController::class, 'join'])->name('reading-plans.join');
     Route::post('/reading-plans/{readingPlan}/leave', [ReadingPlanController::class, 'leave'])->name('reading-plans.leave');
+    Route::post('/reading-plans/{readingPlan}/reset', [ReadingPlanController::class, 'resetProgress'])->name('reading-plans.reset');
+    Route::post('/reading-plans/{readingPlan}/skip', [ReadingPlanController::class, 'skipToDay'])->name('reading-plans.skip');
+    Route::get('/reading-plans/{readingPlan}/progress', [ReadingPlanController::class, 'viewProgress'])->name('reading-plans.progress');
     
 });
 // Admin routes
@@ -41,7 +44,13 @@ Route::middleware(['auth', \App\Http\Middleware\Admin::class])->prefix('admin')-
 Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     // User management
     Route::resource('users', AdminUserController::class);
-    
+      // User Progress routes
+      Route::get('/progress', [App\Http\Controllers\Admin\UserProgressController::class, 'index'])->name('progress.index');
+      Route::get('/progress/user/{user}', [App\Http\Controllers\Admin\UserProgressController::class, 'userDetail'])->name('progress.user');
+      Route::get('/progress/plan/{readingPlan}', [App\Http\Controllers\Admin\UserProgressController::class, 'planDetail'])->name('progress.plan');
+      Route::get('/progress/export', [App\Http\Controllers\Admin\UserProgressController::class, 'export'])->name('progress.export');
+  
+
     // Reading plan management
     Route::resource('reading-plans', AdminReadingPlanController::class);
 });

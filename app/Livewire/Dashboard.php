@@ -15,6 +15,7 @@ class Dashboard extends Component
     public $readingPlan;
     public $userPlan;
     public $todayReading;
+    public $todayChapters = [];
     public $completedToday = false;
     public $readingHistory = [];
     public $groupMessages = [];
@@ -40,6 +41,13 @@ class Dashboard extends Component
         $this->todayReading = DailyReading::where('reading_plan_id', $this->readingPlan->id)
             ->where('day_number', $currentDay)
             ->first();
+            
+        // Get the Bible chapters for today's reading
+        if ($this->todayReading && !$this->todayReading->is_break_day) {
+            $this->todayChapters = $this->todayReading->bibleChapters;
+        } else {
+            $this->todayChapters = []; // Or handle the case where there's no reading for today
+        }
             
         // Check if user has completed today's reading
         $this->completedToday = ReadingProgress::where('user_id', $user->id)
@@ -197,7 +205,7 @@ class Dashboard extends Component
         ]);
         
         // Update user plan statistics
-        $userPlan = $user->reading_plans()->where('reading_plan_id', $this->readingPlan->id)->first();
+        $userPlan = $user->readingPlans()->where('reading_plan_id', $this->readingPlan->id)->first();
         
         // Update streak
         $currentStreak = $userPlan->pivot->current_streak + 1;
@@ -210,7 +218,7 @@ class Dashboard extends Component
         $completionRate = ($completedDays / $totalDays) * 100;
         
         // Update pivot record
-        $user->reading_plans()->updateExistingPivot($this->readingPlan->id, [
+        $user->readingPlans()->updateExistingPivot($this->readingPlan->id, [
             'current_streak' => $currentStreak,
             'completion_rate' => $completionRate,
         ]);
@@ -237,17 +245,22 @@ class Dashboard extends Component
     
     public function render()
     {
-        $nextBreakDays = $this->calculateNextBreakDays();
-        
-        return view('livewire.dashboard', [
-            'readingPlan' => $this->readingPlan,
-            'userPlan' => $this->userPlan,
-            'todayReading' => $this->todayReading,
-            'completedToday' => $this->completedToday,
-            'readingHistory' => $this->readingHistory,
-            'groupMessages' => $this->groupMessages,
-            'calendarDays' => $this->calendarDays,
-            'nextBreakDays' => $nextBreakDays,
+        // Calculate next break days
+        // This should be called in the mount method to avoid unnecessary calculations
+        // but for demonstration, we are calling it here.
+    $nextBreakDays = $this->calculateNextBreakDays();
+    
+    return view('livewire.dashboard', [
+        'readingPlan' => $this->readingPlan,
+        'userPlan' => $this->userPlan,
+        'todayReading' => $this->todayReading,
+        'todayChapters' => $this->todayChapters ?? collect(),
+        'completedToday' => $this->completedToday,
+        'readingHistory' => $this->readingHistory,
+        'groupMessages' => $this->groupMessages,
+        'calendarDays' => $this->calendarDays,
+        'nextBreakDays' => $nextBreakDays,
         ]);
     }
+
 }

@@ -2,10 +2,11 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
+use App\Models\ReadingPlan;
+use App\Models\BibleChapter;
 use App\Models\DailyReading;
 use App\Models\GroupMessage;
-use App\Models\ReadingPlan;
-use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 
 class BibleReadingSeeder extends Seeder
@@ -180,7 +181,7 @@ class BibleReadingSeeder extends Seeder
             $endChapter = $currentBook ? $currentChapter - 1 : $this->oldTestamentBooks[array_key_last($this->oldTestamentBooks)];
             
             // Create the daily reading
-            DailyReading::create([
+            $dailyReading = DailyReading::create([
                 'reading_plan_id' => $readingPlan->id,
                 'day_number' => $day,
                 'book_start' => $startBook,
@@ -189,6 +190,9 @@ class BibleReadingSeeder extends Seeder
                 'chapter_end' => $endChapter,
                 'is_break_day' => false,
             ]);
+            
+            // Associate Bible chapters with this daily reading
+            $this->associateChaptersWithReading($dailyReading, $startBook, $startChapter, $endBook, $endChapter);
             
             // If we've reached the end of the Bible, break
             if (!$currentBook) {
@@ -228,5 +232,50 @@ class BibleReadingSeeder extends Seeder
             'is_admin_message' => true,
             'created_at' => Carbon::now()->subDays(2),
         ]);
+    }
+    
+    /**
+     * Associate Bible chapters with a daily reading
+     */
+    protected function associateChaptersWithReading(DailyReading $dailyReading, $startBook, $startChapter, $endBook, $endChapter): void
+    {
+        $testament = $dailyReading->readingPlan->type === 'old_testament' ? 'old' : 'new';
+        $chaptersToAssociate = [];
+        $currentBook = $startBook;
+        $currentChapter = $startChapter;
+        
+        while (true) {
+            // Find the Bible chapter
+            $bibleChapter = BibleChapter::where('book_name', $currentBook)
+                ->where('chapter_number', $currentChapter)
+                ->where('testament', $testament)
+                ->first();
+                
+            if ($bibleChapter) {
+                $chaptersToAssociate[] = $bibleChapter->id;
+            }
+            
+            // Check if we've reached the end
+            if ($currentBook === $endBook && $currentChapter === $endChapter) {
+                break;
+            }
+            
+            // Move to the next chapter
+            $bookChapters = $currentBook === 'old_testament' ? $this->oldTestamentBooks[$currentBook] : $this->newTestamentBooks[$currentBook];
+            
+            if ($currentChapter < $bookChapters) {
+                // Move to the next chapter in the same book
+                $currentChapter++;
+            } else {
+                // Move to the next book
+                $books = $testament === 'old' ? array_keys($this->oldTestamentBooks) : array_keys($this->newTestamentBooks);
+                $currentIndex = array_search($currentBook, $books);
+                $currentBook = $books[$currentIndex + 1];
+                $currentChapter = 1;
+            }
+        }
+        
+        // Associate the chapters with the daily reading
+        $dailyReading->bibleChapters()->attach($chaptersToAssociate);
     }
 }

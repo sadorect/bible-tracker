@@ -93,6 +93,87 @@ class ReadingPlanController extends Controller
     }
 
     /**
+     * Reset progress in a reading plan.
+     */
+    public function resetProgress(ReadingPlan $readingPlan)
+    {
+        $user = Auth::user();
+        
+        // Check if user is in this plan
+        $existingPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+            
+        if (!$existingPlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'You are not following this reading plan.');
+        }
+        
+        // Delete all reading progress for this user and plan
+        $user->readingProgress()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->delete();
+            
+        // Reset the pivot data
+        $user->readingPlans()->updateExistingPivot($readingPlan->id, [
+            'current_day' => 1,
+            'current_streak' => 0,
+            'completion_rate' => 0,
+            'is_active' => true
+        ]);
+        
+        return redirect()->route('dashboard')
+            ->with('success', 'Your reading progress has been reset.');
+    }
+    
+    /**
+     * Skip to a specific day in the reading plan.
+     */
+    public function skipToDay(Request $request, ReadingPlan $readingPlan)
+    {
+        $request->validate([
+            'day' => 'required|integer|min:1'
+        ]);
+        
+        $user = Auth::user();
+        $day = $request->input('day');
+        
+        // Check if user is in this plan
+        $existingPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+            
+        if (!$existingPlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'You are not following this reading plan.');
+        }
+        
+        // Check if the day is valid
+        $maxDay = $readingPlan->dailyReadings()->max('day_number');
+        if ($day > $maxDay) {
+            return back()->with('error', "The reading plan only has {$maxDay} days.");
+        }
+        
+        // Update the current day
+        $user->readingPlans()->updateExistingPivot($readingPlan->id, [
+            'current_day' => $day
+        ]);
+        
+        // Recalculate completion rate
+        $completedDays = $user->readingProgress()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->count();
+            
+        $completionRate = ($completedDays / $day) * 100;
+        
+        $user->readingPlans()->updateExistingPivot($readingPlan->id, [
+            'completion_rate' => $completionRate
+        ]);
+        
+        return redirect()->route('dashboard')
+            ->with('success', "You've skipped to day {$day} of the reading plan.");
+    }
+    /**
      * Leave a reading plan.
      */
     public function leave(ReadingPlan $readingPlan)

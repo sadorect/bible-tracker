@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Hierarchy;
 use App\Models\ReadingPlan;
+use App\Models\BibleChapter;
 use App\Models\GroupMessage;
 use App\Models\ReadingProgress;
 use Illuminate\Notifications\Notifiable;
@@ -83,6 +84,8 @@ class User extends Authenticatable
                     ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
                     ->withTimestamps();
     }
+
+    
     /**
      * Check if the user is an admin.
      *
@@ -112,5 +115,20 @@ class User extends Authenticatable
             'batch_leader',
             'team_leader'
         ]) || $this->isAdmin();
+    }
+
+    /**
+     * Get all Bible chapters that the user has read.
+     */
+    public function readBibleChapters()
+    {
+        return $this->hasManyThrough(
+            BibleChapter::class,
+            ReadingProgress::class,
+            'user_id', // Foreign key on reading_progress table
+            'id', // Foreign key on bible_chapters table (via pivot)
+            'id', // Local key on users table
+            'daily_reading_id' // Local key on reading_progress table
+        );
     }
 }

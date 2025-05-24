@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
-use App\Models\ReadingPlan;
+use Artisan;
 use Carbon\Carbon;
+use App\Models\ReadingPlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Http\Controllers\Controller;
 
 class AdminReadingPlanController extends Controller
 {
@@ -55,13 +56,14 @@ class AdminReadingPlanController extends Controller
             'is_active' => $request->has('is_active'),
             'additional_info' => $validated['additional_info'] ?? '',
         ]);
-
+    
         // Generate daily readings for the plan
-        // This would typically call a service or use the seeder's method
-        // For now, we'll redirect with a message to use the command
-        
+        \Illuminate\Support\Facades\Artisan::call('reading:generate', [
+            'plan_id' => $readingPlan->id
+        ]);
+    
         return redirect()->route('admin.reading-plans.index')
-            ->with('success', 'Reading plan created successfully. Use the command "php artisan reading:generate" to generate daily readings.');
+            ->with('success', 'Reading plan created successfully with daily readings.');
     }
 
     /**
@@ -93,6 +95,93 @@ class AdminReadingPlanController extends Controller
 
         return redirect()->route('admin.reading-plans.index')
             ->with('success', 'Reading plan updated successfully.');
+    }
+/**
+     * Skip to a specific day in the reading plan.
+     */
+    public function skipToDay(Request $request, ReadingPlan $readingPlan)
+    {
+        $request->validate([
+            'day' => 'required|integer|min:1'
+        ]);
+        
+        $user = Auth::user();
+        $day = $request->input('day');
+        
+        // Check if user is in this plan
+        $existingPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+            
+        if (!$existingPlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'You are not following this reading plan.');
+        }
+        
+        // Check if the day is valid
+        $maxDay = $readingPlan->dailyReadings()->max('day_number');
+        if ($day > $maxDay) {
+            return back()->with('error', "The reading plan only has {$maxDay} days.");
+        }
+        
+        // Update the current day
+        $user->readingPlans()->updateExistingPivot($readingPlan->id, [
+            'current_day' => $day
+        ]);
+        
+        // Recalculate completion rate
+        $completedDays = $user->readingProgress()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->count();
+            
+        $completionRate = ($completedDays / $day) * 100;
+        
+        $user->readingPlans()->updateExistingPivot($readingPlan->id, [
+            'completion_rate' => $completionRate
+        ]);
+        
+        return redirect()->route('admin.dashboard')
+            ->with('success', "You've skipped to day {$day} of the reading plan.");
+    }
+    /**
+     * View all reading progress for a plan.
+     */
+    public function viewProgress(ReadingPlan $readingPlan)
+    {
+        $user = Auth::user();
+        
+        // Check if user is in this plan
+        $existingPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+            
+        if (!$existingPlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'You are not following this reading plan.');
+        }
+        
+        // Get all daily readings for this plan
+        $dailyReadings = $readingPlan->dailyReadings()
+            ->orderBy('day_number')
+            ->get();
+            
+        // Get user's progress for each reading
+        $progress = [];
+        foreach ($dailyReadings as $reading) {
+            $completed = $user->readingProgress()
+                ->where('daily_reading_id', $reading->id)
+                ->first();
+                
+            $progress[] = [
+                'day' => $reading->day_number,
+                'reading' => $reading->reading_range,
+                'is_break_day' => $reading->is_break_day,
+                'completed' => $completed !== null,
+                'completed_date' => $completed ? $completed->completed_date : null,
+            ];
+        }
+        
+        return view('reading-plans.progress', compact('readingPlan', 'progress'));
     }
 
     /**

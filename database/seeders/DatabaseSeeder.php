@@ -17,10 +17,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,         // First create users
-            HierarchySeeder::class,    // Then create hierarchies
-            BibleReadingSeeder::class, // Finally seed bible chapters
-            AdminUserSeeder::class,
+            //UserSeeder::class,         // First create users
+            //HierarchySeeder::class,    // Then create hierarchies
+            BibleChapterSeeder::class, // Finally seed bible chapters
+            //AdminUserSeeder::class,
         ]);
     }
 }

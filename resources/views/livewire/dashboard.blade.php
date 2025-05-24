@@ -15,6 +15,20 @@
                     <p class="text-gray-600">{{ $readingPlan->type == 'old_testament' ? 'Old Testament' : 'New Testament' }} Reading Plan</p>
                 @endif
             </div>
+            @if($todayReading && !$todayReading->is_break_day)
+                <div class="mt-4 text-left">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Chapters to Read:</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        @foreach($todayChapters as $chapter)
+                            @if(Route::has('bible.chapter'))<a href="{{ route('bible.chapter', [$chapter->book_name, $chapter->chapter_number]) }}"                              class="bg-blue-50 hover:bg-blue-100 rounded-md p-2 text-center">
+                                @else
+                                <span class="text-sm font-medium text-blue-700">{{ $chapter->book_name }} {{ $chapter->chapter_number }}</span>
+                            </a>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             <div class="flex justify-center mt-4">
                 @if($completedToday)
                     <button class="bg-green-200 text-green-800 font-bold py-2 px-6 rounded-lg cursor-default">
