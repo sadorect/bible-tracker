@@ -28,6 +28,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/progress/view', [ReadingProgressController::class, 'view'])->name('progress.view');
+    Route::post('/quick-mark-complete', [ReadingProgressController::class, 'quickMark'])->name('reading.quick-mark');
     // Reading Plans routes
     Route::get('/reading-plans', [ReadingPlanController::class, 'index'])->name('reading-plans.index');
     Route::get('/reading-plans/{readingPlan}', [ReadingPlanController::class, 'show'])->name('reading-plans.show');

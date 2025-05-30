@@ -31,6 +31,11 @@ class Dashboard extends Component
     public $missedReadings = [];
     public $readingPlanId;
     public $userId;
+    public $showQuickMarkModal = false;
+    public $quickMarkDay = '';
+    public $quickMarkError = '';
+    public $quickMarkSuccess = '';
+    protected $user;
     
     public function mount()
     {
@@ -135,6 +140,106 @@ class Dashboard extends Component
         $this->generateCalendarDays();
     }
     
+    public function showQuickMarkForm()
+    { 
+        logger('showQuickMarkForm called - before setting modal to true');
+        $this->showQuickMarkModal = true;
+        logger('showQuickMarkModal is now: ' . ($this->showQuickMarkModal ? 'true' : 'false'));
+        $this->quickMarkDay = '';
+        $this->quickMarkError = '';
+        // Force a refresh
+    // Dispatch an event to force update
+    $this->dispatch('show-quick-mark-modal');
+    $this->dispatch('modal-opened');
+        logger('showQuickMarkForm called - after setting modal to true');
+    }
+    
+    public function closeQuickMarkModal()
+    {
+        $this->showQuickMarkModal = false;
+        $this->quickMarkDay = '';
+        $this->quickMarkError = '';
+    }
+    
+    public function quickMarkComplete()
+    {
+        $this->quickMarkError = '';
+        
+        // Validate input
+        if (empty($this->quickMarkDay) || !is_numeric($this->quickMarkDay)) {
+            $this->quickMarkError = 'Please enter a valid day number.';
+            return;
+        }
+        
+        $dayNumber = (int) $this->quickMarkDay;
+        
+        // Check if day is valid (not future, within plan range)
+        if ($dayNumber > $this->userPlan->pivot->current_day) {
+            $this->quickMarkError = 'Cannot mark future days as complete.';
+            return;
+        }
+        
+        if ($dayNumber < 1) {
+            $this->quickMarkError = 'Day number must be 1 or greater.';
+            return;
+        }
+        
+        // Find the daily reading for this day
+        $dailyReading = DailyReading::where('reading_plan_id', $this->readingPlan->id)
+            ->where('day_number', $dayNumber)
+            ->first();
+            
+        if (!$dailyReading) {
+            $this->quickMarkError = "Day {$dayNumber} not found in this reading plan.";
+            return;
+        }
+        
+        if ($dailyReading->is_break_day) {
+            $this->quickMarkError = "Day {$dayNumber} is a break day - no reading to complete.";
+            return;
+        }
+        
+        $user = Auth::user();
+        
+        // Check if already completed
+        $alreadyCompleted = ReadingProgress::where('user_id', $user->id)
+            ->where('daily_reading_id', $dailyReading->id)
+            ->exists();
+            
+        if ($alreadyCompleted) {
+            $this->quickMarkError = "Day {$dayNumber} is already marked as complete.";
+            return;
+        }
+        
+        // Mark as complete
+        ReadingProgress::create([
+            'user_id' => $user->id,
+            'reading_plan_id' => $this->readingPlan->id,
+            'daily_reading_id' => $dailyReading->id,
+            'completed_date' => Carbon::today(),
+        ]);
+        
+        // Update completion rate
+        if ($this->userPlan->pivot) {
+            $completedDays = ReadingProgress::where('user_id', $user->id)
+                ->where('reading_plan_id', $this->readingPlan->id)
+                ->count();
+            
+            $totalDays = $this->userPlan->pivot->current_day;
+            $completionRate = $totalDays > 0 ? ($completedDays / $totalDays) * 100 : 0;
+            
+            $user->readingPlans()->updateExistingPivot($this->readingPlan->id, [
+                'completion_rate' => $completionRate,
+            ]);
+        }
+        
+        session()->flash('message', "Day {$dayNumber} ({$dailyReading->reading_range}) marked as complete!");
+        $this->closeQuickMarkModal();
+        
+        // Refresh component data
+        $this->mount();
+    }
+
     protected function loadUserPlanData()
     {
         $user = Auth::user();
@@ -336,7 +441,8 @@ class Dashboard extends Component
 
         public function markAsComplete()
     {
-        if (!$this->userPlan || !$this->userPlan->pivot || !$this->todayReading) {
+        $user = Auth::user();
+        if (!$user || !$this->userPlan || !$this->userPlan->pivot || !$this->todayReading) {
             session()->flash('error', 'Unable to mark as complete. Please refresh the page.');
             return;
         }

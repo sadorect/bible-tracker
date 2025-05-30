@@ -75,8 +75,12 @@
     
     <!-- Livewire Scripts -->
     @livewireScripts
+    <script>
+        if (window.Alpine) {
+            console.warn('Alpine.js already loaded');
+        }
+    </script>
     
-    <!-- AlpineJS -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  
 </body>
 </html>

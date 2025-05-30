@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ReadingProgress;
-use App\Models\BibleChapter;
 use Carbon\Carbon;
+use App\Models\BibleChapter;
+use App\Models\DailyReading;
+use Illuminate\Http\Request;
+use App\Models\ReadingProgress;
+use Illuminate\Support\Facades\Auth;
 
 class ReadingProgressController extends Controller
 {
@@ -117,6 +120,74 @@ public function getReadingPlans()
     $readingPlans = $user->reading_plans()->with('chapters')->get();
 
     return view('reading.plans', compact('readingPlans'));
+}
+
+public function quickMark(Request $request)
+{
+    $request->validate([
+        'day_number' => 'required|integer|min:1'
+    ]);
+    
+    $user = Auth::user();
+    $dayNumber = $request->day_number;
+    
+    // Get user's active reading plan
+    $userPlan = $user->readingPlans()
+        ->where('user_reading_plans.is_active', true)
+        ->first();
+        
+    if (!$userPlan) {
+        return back()->with('error', 'No active reading plan found.');
+    }
+    
+    // Validate day number
+    if ($dayNumber > $userPlan->pivot->current_day) {
+        return back()->with('error', 'Cannot mark future days as complete.');
+    }
+    
+    // Find the daily reading
+    $dailyReading = DailyReading::where('reading_plan_id', $userPlan->id)
+        ->where('day_number', $dayNumber)
+        ->first();
+        
+    if (!$dailyReading) {
+        return back()->with('error', "Day {$dayNumber} not found in reading plan.");
+    }
+    
+    if ($dailyReading->is_break_day) {
+        return back()->with('error', "Day {$dayNumber} is a break day.");
+    }
+    
+    // Check if already completed
+    $alreadyCompleted = ReadingProgress::where('user_id', $user->id)
+        ->where('daily_reading_id', $dailyReading->id)
+        ->exists();
+        
+    if ($alreadyCompleted) {
+        return back()->with('error', "Day {$dayNumber} is already completed.");
+    }
+    
+    // Mark as complete
+    ReadingProgress::create([
+        'user_id' => $user->id,
+        'reading_plan_id' => $userPlan->id,
+        'daily_reading_id' => $dailyReading->id,
+        'completed_date' => Carbon::today(),
+    ]);
+    
+    // Update completion rate
+    $completedDays = ReadingProgress::where('user_id', $user->id)
+        ->where('reading_plan_id', $userPlan->id)
+        ->count();
+        
+    $totalDays = $userPlan->pivot->current_day;
+    $completionRate = ($completedDays / $totalDays) * 100;
+    
+    $user->readingPlans()->updateExistingPivot($userPlan->id, [
+        'completion_rate' => $completionRate,
+    ]);
+    
+    return back()->with('success', "Day {$dayNumber} ({$dailyReading->reading_range}) marked as complete!");
 }
 
 
