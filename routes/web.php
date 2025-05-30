@@ -36,7 +36,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/reading-plans/{readingPlan}/reset', [ReadingPlanController::class, 'resetProgress'])->name('reading-plans.reset');
     Route::post('/reading-plans/{readingPlan}/skip', [ReadingPlanController::class, 'skipToDay'])->name('reading-plans.skip');
     Route::get('/reading-plans/{readingPlan}/progress', [ReadingPlanController::class, 'viewProgress'])->name('reading-plans.progress');
-    
+    Route::get('/reading-history', \App\Livewire\ReadingHistory::class)->name('reading-history');
 });
 // Admin routes
 Route::middleware(['auth', \App\Http\Middleware\Admin::class])->prefix('admin')->name('admin.')->group(function () {
@@ -53,6 +53,9 @@ Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dash
 
     // Reading plan management
     Route::resource('reading-plans', AdminReadingPlanController::class);
+
+    
+
 });
 
 require __DIR__.'/auth.php';
