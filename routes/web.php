@@ -42,9 +42,13 @@ Route::middleware(['auth'])->group(function () {
 // Admin routes
 Route::middleware(['auth', \App\Http\Middleware\Admin::class])->prefix('admin')->name('admin.')->group(function () {
     // Admin dashboard
-Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     // User management
     Route::resource('users', AdminUserController::class);
+    // User Management Routes
+    
+    Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])
+        ->name('users.bulk-action');
       // User Progress routes
       Route::get('/progress', [App\Http\Controllers\Admin\UserProgressController::class, 'index'])->name('progress.index');
       Route::get('/progress/user/{user}', [App\Http\Controllers\Admin\UserProgressController::class, 'userDetail'])->name('progress.user');

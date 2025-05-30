@@ -46,7 +46,7 @@
                     <a href="{{ route('admin.progress.index') }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-center transition">
                         View Progress Reports
                     </a>
-                    <a href="#" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg text-center transition">
+                    <a href="{{route('admin.users.index')}}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg text-center transition">
                         Manage Users
                     </a>
                     <a href="#" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg text-center transition">
