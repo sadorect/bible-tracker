@@ -2,6 +2,7 @@
 
 use Admin\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -17,6 +18,11 @@ Route::get('/', function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function() {
+        // Check if user is admin and redirect to admin dashboard
+        if (Auth::user()->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
+        
         return view('dashboard');
     })->name('dashboard');
     Route::get('/progress', [DashboardController::class, 'progress'])->name('progress');
@@ -39,28 +45,28 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reading-plans/{readingPlan}/progress', [ReadingPlanController::class, 'viewProgress'])->name('reading-plans.progress');
     Route::get('/reading-history', \App\Livewire\ReadingHistory::class)->name('reading-history');
 });
-// Admin routes
+// Admin routes - All routes will have /admin prefix
 Route::middleware(['auth', \App\Http\Middleware\Admin::class])->prefix('admin')->name('admin.')->group(function () {
-    // Admin dashboard
-    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-    // User management
+    // Admin dashboard - URL: /admin/dashboard
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    
+    // User management - URLs: /admin/users/*
     Route::resource('users', AdminUserController::class);
-    // User Management Routes
+    Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])->name('users.bulk-action');
     
-    Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])
-        ->name('users.bulk-action');
-      // User Progress routes
-      Route::get('/progress', [App\Http\Controllers\Admin\UserProgressController::class, 'index'])->name('progress.index');
-      Route::get('/progress/user/{user}', [App\Http\Controllers\Admin\UserProgressController::class, 'userDetail'])->name('progress.user');
-      Route::get('/progress/plan/{readingPlan}', [App\Http\Controllers\Admin\UserProgressController::class, 'planDetail'])->name('progress.plan');
-      Route::get('/progress/export', [App\Http\Controllers\Admin\UserProgressController::class, 'export'])->name('progress.export');
-  
+    // User Progress routes - URLs: /admin/progress/*
+    Route::get('progress', [App\Http\Controllers\Admin\UserProgressController::class, 'index'])->name('progress.index');
+    Route::get('progress/user/{user}', [App\Http\Controllers\Admin\UserProgressController::class, 'userDetail'])->name('progress.user');
+    Route::get('progress/plan/{readingPlan}', [App\Http\Controllers\Admin\UserProgressController::class, 'planDetail'])->name('progress.plan');
+    Route::get('progress/export', [App\Http\Controllers\Admin\UserProgressController::class, 'export'])->name('progress.export');
 
-    // Reading plan management
+    // Reading plan management - URLs: /admin/reading-plans/*
     Route::resource('reading-plans', AdminReadingPlanController::class);
-
     
-
+    // Additional admin routes can be added here
+    Route::get('settings', function() {
+        return view('admin.settings');
+    })->name('settings');
 });
 
 require __DIR__.'/auth.php';
