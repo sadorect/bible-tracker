@@ -51,8 +51,10 @@ class ReadingHistory extends Component
         $user = Auth::user();
 
         // Get all daily readings for the user's active plan up to current day
+        $currentDay = $this->userPlan->pivot ? $this->userPlan->pivot->current_day : 0;
+
         $query = \App\Models\DailyReading::where('reading_plan_id', $this->userPlan->id)
-            ->where('day_number', '<=', $this->userPlan->pivot->current_day)
+            ->where('day_number', '<=', $currentDay)
             ->orderBy('day_number', 'desc');
 
         // Apply search filter

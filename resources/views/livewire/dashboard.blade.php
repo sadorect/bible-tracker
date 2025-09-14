@@ -109,25 +109,18 @@
                   
                   <!-- Catch up button (only show on current day if there are missed readings) -->
                   @if($viewingDay && $viewingDay == $userPlan->pivot->current_day)
-                      <button wire:click="showCatchUpOptions" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
+                      <button wire:click="showCatchUpOptions" 
+                              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
+                          <i class="fas fa-clock mr-2"></i>
                           Catch Up on Missed Days
                       </button>
-                      <button wire:click="showQuickMarkForm" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
-                        Quick Mark Complete
-                    </button>
                   @endif
               </div>
           </div>
 
-          <!-- Add this right after the "TODAY'S READING" card for testing -->
-    <div class="mb-4">
-  <button  class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
-      Update Previous Days Missed
-  </button>
-  
-</div>
+          </div>
 
-   <!-- Add this simple form anywhere in your dashboard -->
+   <!-- Existing Quick Mark Complete Form -->
 <div class="bg-white rounded-lg shadow p-6 mb-6">
   <h3 class="font-bold text-lg mb-4 text-gray-700">Quick Mark Complete</h3>
   
@@ -450,68 +443,6 @@
               </div>
           </div>
       @endif
-
-          <!-- Add this modal after the existing catch-up modal -->
-<!-- Quick Mark Complete Modal -->
-@if($showQuickMarkModal)
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="closeQuickMarkModal">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white" wire:click.stop>
-        <div class="mt-3">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Quick Mark Day Complete</h3>
-                <button wire:click="closeQuickMarkModal" class="text-gray-400 hover:text-gray-600">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label for="quickMarkDay" class="block text-sm font-medium text-gray-700 mb-2">
-                        Enter Day Number (1 to {{ $userPlan && $userPlan->pivot ? $userPlan->pivot->current_day : 'N/A' }})
-                    </label>
-                    <input 
-                        type="number" 
-                        id="quickMarkDay"
-                        wire:model="quickMarkDay"
-                        min="1" 
-                        max="{{ $userPlan && $userPlan->pivot ? $userPlan->pivot->current_day : 1 }}"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        placeholder="e.g., 5"
-                    >
-                </div>
-                
-                @if($quickMarkError)
-                    <div class="bg-red-50 border border-red-200 rounded-md p-3">
-                        <p class="text-sm text-red-600">{{ $quickMarkError }}</p>
-                    </div>
-                @endif
-                
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                    <p class="text-sm text-blue-600">
-                        <strong>Note:</strong> You can only mark previous days (up to today) as complete. 
-                        Break days cannot be marked as complete.
-                    </p>
-                </div>
-            </div>
-            
-            <div class="mt-6 flex justify-end space-x-3">
-                <button 
-                    wire:click="closeQuickMarkModal"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button 
-                    wire:click="quickMarkComplete"
-                    class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700">
-                    Mark Complete
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-@endif
 
       <!-- Flash Messages -->
       @if (session()->has('message'))
