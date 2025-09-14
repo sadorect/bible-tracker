@@ -16,25 +16,23 @@ class Admin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        /*
-        if (!Auth::check() || !Auth::user()->isAdmin()) {
+        Log::info('Admin middleware called');
+        
+        if (!Auth::check()) {
+            Log::warning('User is not authenticated. Redirecting...');
+            return redirect()->route('dashboard')
+                ->with('error', 'You must be logged in to access this area.');
+        }
+
+        $user = Auth::user();
+        Log::info('User is authenticated. User ID: ' . $user->id . ', Role: ' . $user->role);
+        
+        if (!$user->isAdmin()) {
+            Log::warning('User is not an admin. Redirecting...');
             return redirect()->route('dashboard')
                 ->with('error', 'You do not have permission to access this area.');
         }
-*/
-Log::info('Admin middleware called'); // Add this line
-if (Auth::check()) {
-    Log::info('User is authenticated. User ID: ' . Auth::user()->id . ', Role: ' . Auth::user()->role); // Add this line
-    if (!Auth::user()->isAdmin()) {
-        Log::warning('User is not an admin. Redirecting...'); // Add this line
-        return redirect()->route('dashboard')
-            ->with('error', 'You do not have permission to access this area.');
-    }
-} else {
-    Log::warning('User is not authenticated. Redirecting...'); // Add this line
-    return redirect()->route('dashboard')
-        ->with('error', 'You do not have permission to access this area.');
-}
+
         return $next($request);
     }
 }
