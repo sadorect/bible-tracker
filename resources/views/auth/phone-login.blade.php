@@ -1,38 +1,31 @@
-<x-guest-layout>
-    <div class="min-h-screen flex items-center justify-center bg-gray-50">
-        <div class="max-w-md w-full space-y-8">
-            <div>
-                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Bible Reading Tracker
-                </h2>
-                <p class="mt-2 text-center text-sm text-gray-600">
-                    Sign in with your phone number
-                </p>
-            </div>
-            <form class="mt-8 space-y-6" action="{{ route('login') }}" method="POST">
-                @csrf
-                <div class="rounded-md shadow-sm -space-y-px">
-                    <div>
-                        <label for="phone_number" class="sr-only">Phone Number</label>
-                        <input id="phone_number" name="phone_number" type="text" required 
-                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
-                            placeholder="Phone Number">
-                    </div>
-                    <div>
-                        <label for="password" class="sr-only">Password</label>
-                        <input id="password" name="password" type="password" required 
-                            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
-                            placeholder="Password">
-                    </div>
-                </div>
-
-                <div>
-                    <button type="submit" 
-                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                        Sign in
-                    </button>
-                </div>
-            </form>
+<x-guest-layout wide>
+    <x-slot name="aside">
+        <div class="max-w-xl">
+            <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white">Phone sign in</h2>
+            <p class="mt-3 text-gray-700 dark:text-gray-300">Use your phone number to access your plans and progress quickly.</p>
         </div>
+    </x-slot>
+
+    <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Sign in with phone</h1>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Enter your phone number and password</p>
     </div>
+
+    <form class="space-y-4" action="{{ route('login') }}" method="POST">
+        @csrf
+        <div>
+            <x-input-label for="phone_number" :value="__('Phone Number')" />
+            <x-text-input id="phone_number" name="phone_number" type="text" class="block mt-1 w-full" required />
+            <x-input-error :messages="$errors->get('phone_number')" class="mt-2" />
+        </div>
+        <div>
+            <x-input-label for="password" :value="__('Password')" />
+            <x-text-input id="password" name="password" type="password" class="block mt-1 w-full" required autocomplete="current-password" />
+            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        </div>
+
+        <x-primary-button class="w-full justify-center bg-emerald-600 hover:bg-emerald-700">
+            {{ __('Sign in') }}
+        </x-primary-button>
+    </form>
 </x-guest-layout>

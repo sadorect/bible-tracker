@@ -14,7 +14,13 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans text-gray-900 antialiased bg-gray-100 dark:bg-gray-900">
+    <body class="font-sans text-gray-900 antialiased bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50 dark:from-gray-950 dark:via-teal-950 dark:to-emerald-950">
+        <style>
+            @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(8px)} }
+            .mesh { background: radial-gradient(40% 50% at 10% 10%, rgba(20,184,166,.18) 0%, rgba(20,184,166,0) 100%),
+                              radial-gradient(40% 50% at 90% 20%, rgba(59,130,246,.18) 0%, rgba(59,130,246,0) 100%),
+                              radial-gradient(50% 60% at 20% 90%, rgba(245,158,11,.16) 0%, rgba(245,158,11,0) 100%); }
+        </style>
         <!-- Simple Top Navigation -->
         <nav class="bg-white/90 dark:bg-gray-800/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -38,10 +44,27 @@
             </div>
         </nav>
 
-        <div class="min-h-[calc(100vh-4rem)] flex flex-col sm:justify-center items-center pt-6 sm:pt-0">
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-lg">
-                {{ $slot }}
-            </div>
+        <div class="relative min-h-[calc(100vh-4rem)]">
+            <div class="mesh absolute inset-0 pointer-events-none"></div>
+
+            @if ($attributes->has('wide'))
+                <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid md:grid-cols-2 gap-10 items-center">
+                    <div class="hidden md:block">
+                        {{ $aside ?? '' }}
+                    </div>
+                    <div class="flex justify-center">
+                        <div class="w-full sm:max-w-md px-6 py-6 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-xl border border-gray-200/80 dark:border-gray-700/60">
+                            {{ $slot }}
+                        </div>
+                    </div>
+                </div>
+            @else
+                <div class="relative flex flex-col sm:justify-center items-center pt-6 sm:pt-0">
+                    <div class="w-full sm:max-w-md mt-6 px-6 py-6 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-xl border border-gray-200/80 dark:border-gray-700/60">
+                        {{ $slot }}
+                    </div>
+                </div>
+            @endif
         </div>
     </body>
 </html>
