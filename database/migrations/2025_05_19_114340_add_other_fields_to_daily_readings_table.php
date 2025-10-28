@@ -11,16 +11,28 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('daily_readings', function (Blueprint $table) {
-            $table->integer('day_number');
-    $table->string('book_start');
-    $table->integer('chapter_start');
-    $table->string('book_end');
-    $table->integer('chapter_end');
-    $table->boolean('is_break_day')->default(false);
-        
-        
-        });
+        if (Schema::hasTable('daily_readings')) {
+            Schema::table('daily_readings', function (Blueprint $table) {
+                if (!Schema::hasColumn('daily_readings', 'day_number')) {
+                    $table->integer('day_number');
+                }
+                if (!Schema::hasColumn('daily_readings', 'book_start')) {
+                    $table->string('book_start');
+                }
+                if (!Schema::hasColumn('daily_readings', 'chapter_start')) {
+                    $table->integer('chapter_start');
+                }
+                if (!Schema::hasColumn('daily_readings', 'book_end')) {
+                    $table->string('book_end');
+                }
+                if (!Schema::hasColumn('daily_readings', 'chapter_end')) {
+                    $table->integer('chapter_end');
+                }
+                if (!Schema::hasColumn('daily_readings', 'is_break_day')) {
+                    $table->boolean('is_break_day')->default(false);
+                }
+            });
+        }
     }
 
     /**
@@ -28,9 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('daily_readings', function (Blueprint $table) {
-            $table->dropForeign(['reading_plan_id']);
-            $table->dropColumn('reading_plan_id');
-        });
+        // No-op: fields are part of the base table in fresh installs.
     }
 };

@@ -11,16 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('daily_readings', function (Blueprint $table) {
-            $table->id();
-            $table->integer('day_number');
-    $table->string('book_start');
-    $table->integer('chapter_start');
-    $table->string('book_end');
-    $table->integer('chapter_end');
-    $table->boolean('is_break_day')->default(false);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('daily_readings')) {
+            Schema::create('daily_readings', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('reading_plan_id')->constrained()->onDelete('cascade');
+                $table->integer('day_number');
+                $table->string('book_start');
+                $table->integer('chapter_start');
+                $table->string('book_end');
+                $table->integer('chapter_end');
+                $table->boolean('is_break_day')->default(false);
+                $table->timestamps();
+            });
+        }
     }
 
     /**

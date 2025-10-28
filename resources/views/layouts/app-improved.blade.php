@@ -169,7 +169,7 @@
                         <i class="fas fa-history mr-3"></i>
                         Reading History
                     </a>
-                    <a href="{{ route('progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('progress') ? 'bg-blue-50 text-blue-700' : '' }}">
+                    <a href="{{ route('reading.progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ (request()->routeIs('reading.progress') || request()->routeIs('progress.view')) ? 'bg-blue-50 text-blue-700' : '' }}">
                         <i class="fas fa-chart-line mr-3"></i>
                         Progress
                     </a>
@@ -193,7 +193,7 @@
                         <i class="fas fa-history mr-3"></i>
                         Reading History
                     </a>
-                    <a href="{{ route('progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('progress') ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
+                    <a href="{{ route('reading.progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ (request()->routeIs('reading.progress') || request()->routeIs('progress.view')) ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
                         <i class="fas fa-chart-line mr-3"></i>
                         Progress
                     </a>

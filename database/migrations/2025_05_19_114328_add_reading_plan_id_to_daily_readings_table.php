@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('daily_readings', function (Blueprint $table) {
-            $table->foreignId('reading_plan_id')->after('id')->constrained()->onDelete('cascade');
-        
-        });
+        if (Schema::hasTable('daily_readings') && !Schema::hasColumn('daily_readings', 'reading_plan_id')) {
+            Schema::table('daily_readings', function (Blueprint $table) {
+                $table->foreignId('reading_plan_id')->after('id')->constrained()->onDelete('cascade');
+            });
+        }
     }
 
     /**
@@ -22,9 +23,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('daily_readings', function (Blueprint $table) {
-            $table->dropForeign(['reading_plan_id']);
-            $table->dropColumn('reading_plan_id');
-        });
+        if (Schema::hasTable('daily_readings') && Schema::hasColumn('daily_readings', 'reading_plan_id')) {
+            Schema::table('daily_readings', function (Blueprint $table) {
+                $table->dropForeign(['reading_plan_id']);
+                $table->dropColumn('reading_plan_id');
+            });
+        }
     }
 };

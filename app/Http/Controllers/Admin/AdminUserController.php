@@ -118,7 +118,7 @@ class AdminUserController extends Controller
             if ($request->filled('reading_plans')) {
                 foreach ($request->reading_plans as $planId) {
                     $user->readingPlans()->attach($planId, [
-                        'joined_at' => now(),
+                        'joined_date' => now()->toDateString(),
                         'current_day' => 1,
                     ]);
                 }
@@ -169,7 +169,7 @@ class AdminUserController extends Controller
                     $existingPivot = $user->readingPlans()->where('reading_plans.id', $planId)->first();
                     $syncData[$planId] = $existingPivot ? 
                         $existingPivot->pivot->toArray() : 
-                        ['joined_at' => now(), 'current_day' => 1];
+                        ['joined_date' => now()->toDateString(), 'current_day' => 1];
                 }
                 $user->readingPlans()->sync($syncData);
             } else {
@@ -217,8 +217,7 @@ class AdminUserController extends Controller
                 foreach ($users as $user) {
                     $user->readingPlans()->syncWithoutDetaching([
                         $request->reading_plan_id => [
-                            'joined_at' => now(),
-                            'joined_date' => now(),
+                            'joined_date' => now()->toDateString(),
                             'current_day' => 1,
                         ]
                     ]);

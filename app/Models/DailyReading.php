@@ -48,10 +48,6 @@ class DailyReading extends Model
     {
         return $this->hasMany(ReadingProgress::class);
     }
-    public function progress(): HasMany
-    {
-        return $this->hasMany(ReadingProgress::class);
-    }
 
     /**
      * Get the reading range as a formatted string.

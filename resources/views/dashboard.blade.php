@@ -2,6 +2,11 @@
 
 @section('content')
     <div class="space-y-6">
+        @php
+            $user = auth()->user();
+            $activePlan = $user?->readingPlans()->where('user_reading_plans.is_active', true)->first();
+            $currentStreak = $activePlan?->pivot->current_streak ?? 0;
+        @endphp
         <!-- Page Header -->
         <div class="bg-white rounded-lg shadow-sm p-6">
             <div class="flex items-center justify-between">
@@ -12,7 +17,7 @@
                 <div class="flex items-center space-x-4">
                     <div class="bg-blue-50 rounded-lg p-3 text-center">
                         <div class="text-sm text-blue-600 font-medium">Current Streak</div>
-                        <div class="text-2xl font-bold text-blue-700">🔥 7</div>
+                        <div class="text-2xl font-bold text-blue-700">🔥 {{ $currentStreak }}</div>
                     </div>
                 </div>
             </div>

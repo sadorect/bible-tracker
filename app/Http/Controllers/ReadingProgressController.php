@@ -13,57 +13,52 @@ class ReadingProgressController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
-        
-        $newTestamentProgress = [
-            'current_day' => ReadingProgress::getNextDay($user->id, 'new'),
-            'total_days' => BibleChapter::getTotalDays('new'),
-            'completion_rate' => $this->calculateCompletionRate($user->id, 'new'),
-            'today_chapters' => $this->getTodayChapters($user->id, 'new')
-        ];
-        
-        $oldTestamentProgress = [
-            'current_day' => ReadingProgress::getNextDay($user->id, 'old'),
-            'total_days' => BibleChapter::getTotalDays('old'),
-            'completion_rate' => $this->calculateCompletionRate($user->id, 'old'),
-            'today_chapters' => $this->getTodayChapters($user->id, 'old')
-        ];
+        $user = Auth::user();
 
-        return view('reading.progress', compact('newTestamentProgress', 'oldTestamentProgress'));
-    }
+        // Get the user's active reading plan
+        $activePlan = $user->readingPlans()
+            ->where('user_reading_plans.is_active', true)
+            ->first();
 
-    public function markAsComplete($testament)
-    {
-        $user = auth()->user();
-        $nextDay = ReadingProgress::getNextDay($user->id, $testament);
-        
-        ReadingProgress::create([
-            'user_id' => $user->id,
-            'day_number' => $nextDay,
-            'testament' => $testament,
-            'chapters_range' => BibleChapter::getDayRange($nextDay, $testament),
-            'is_completed' => true,
-            'completed_at' => Carbon::now()
+        if (!$activePlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'No active reading plan found. Please join a reading plan first.');
+        }
+
+        // Calculate the current day based on plan start date
+        $startDate = Carbon::parse($activePlan->start_date);
+        $today = Carbon::today();
+        $daysSinceStart = $startDate->diffInDays($today, false);
+        $calculatedCurrentDay = $daysSinceStart < 0 ? 1 : $daysSinceStart + 1;
+
+        // Clamp to max day in the plan
+        $maxDay = DailyReading::where('reading_plan_id', $activePlan->id)->max('day_number');
+        $calculatedCurrentDay = min($calculatedCurrentDay, (int) $maxDay);
+
+        // Update pivot if different
+        if ($activePlan->pivot && $activePlan->pivot->current_day != $calculatedCurrentDay) {
+            $user->readingPlans()->updateExistingPivot($activePlan->id, [
+                'current_day' => $calculatedCurrentDay,
+            ]);
+            // Refresh active plan
+            $activePlan = $user->readingPlans()
+                ->where('user_reading_plans.is_active', true)
+                ->first();
+        }
+
+        // Today's reading (may be break day)
+        $todayReading = DailyReading::where('reading_plan_id', $activePlan->id)
+            ->where('day_number', $activePlan->pivot->current_day)
+            ->first();
+
+        // All user's reading plans for the summary grid
+        $readingPlans = $user->readingPlans()->get();
+
+        return view('reading-progress.index', [
+            'readingPlan' => $activePlan,
+            'todayReading' => $todayReading,
+            'readingPlans' => $readingPlans,
         ]);
-
-        return response()->json([
-            'success' => true,
-            'next_chapters' => $this->getTodayChapters($user->id, $testament)
-        ]);
-    }
-
-    private function calculateCompletionRate($userId, $testament)
-    {
-        $completed = ReadingProgress::getCurrentProgress($userId, $testament);
-        $total = BibleChapter::getTotalDays($testament);
-        
-        return ($completed / $total) * 100;
-    }
-
-    private function getTodayChapters($userId, $testament)
-    {
-        $nextDay = ReadingProgress::getNextDay($userId, $testament);
-        return BibleChapter::getChaptersForDay($nextDay, $testament);
     }
 
     public function view($request)
@@ -112,14 +107,6 @@ class ReadingProgressController extends Controller
         return view('reading-progress.view', [
             'planId' => $planId
         ]);
-}
-
-public function getReadingPlans()
-{
-    $user = auth()->user();
-    $readingPlans = $user->reading_plans()->with('chapters')->get();
-
-    return view('reading.plans', compact('readingPlans'));
 }
 
 public function quickMark(Request $request)
