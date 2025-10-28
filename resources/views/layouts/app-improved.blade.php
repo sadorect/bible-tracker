@@ -20,8 +20,7 @@
     <!-- Livewire Styles -->
     @livewireStyles
 
-    <!-- Alpine.js -->
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Alpine is loaded via Vite (resources/js/app.js). Removed CDN include to avoid multiple Alpine instances. -->
 </head>
 <body class="font-inter antialiased bg-gray-50" x-data="{ sidebarOpen: false }">
     <div class="min-h-screen">

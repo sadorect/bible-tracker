@@ -31,6 +31,8 @@ class Dashboard extends Component
     public $missedReadings = [];
     public $readingPlanId;
     public $userId;
+    public $calendarYear;
+    public $calendarMonth;
     protected $user;
     
     public function mount()
@@ -132,7 +134,10 @@ class Dashboard extends Component
         // Get recent group messages
         $this->loadGroupMessages();
         
-        // Generate calendar days for current month
+        // Initialize calendar month/year and generate calendar days
+        $today = Carbon::today();
+        $this->calendarYear = $today->year;
+        $this->calendarMonth = $today->month;
         $this->generateCalendarDays();
     }
     
@@ -259,8 +264,8 @@ class Dashboard extends Component
         
         $user = Auth::user();
         $today = Carbon::today();
-        $firstDayOfMonth = Carbon::today()->startOfMonth();
-        $lastDayOfMonth = Carbon::today()->endOfMonth();
+        $firstDayOfMonth = Carbon::create($this->calendarYear, $this->calendarMonth, 1)->startOfMonth();
+        $lastDayOfMonth = Carbon::create($this->calendarYear, $this->calendarMonth, 1)->endOfMonth();
         
         // Get start of calendar grid (might be in previous month)
         $calendarStart = $firstDayOfMonth->copy()->startOfWeek();
@@ -272,7 +277,7 @@ class Dashboard extends Component
         $days = [];
         $currentDate = $calendarStart->copy();
         
-        // Get all user's completed readings for efficiency
+        // Get all user's completed readings for efficiency (set of day_numbers)
         $completedReadings = ReadingProgress::where('user_id', $user->id)
             ->where('reading_progress.reading_plan_id', $this->readingPlan->id)
             ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
@@ -281,7 +286,8 @@ class Dashboard extends Component
         
         while ($currentDate <= $calendarEnd) {
             $dayNumber = $currentDate->day;
-            $isCurrentMonth = $currentDate->month === $today->month;
+            // Mark current-month cells relative to the displayed month/year, not today's month
+            $isCurrentMonth = $currentDate->month === $firstDayOfMonth->month && $currentDate->year === $firstDayOfMonth->year;
             
             // Calculate if this day corresponds to a reading day
             $planStartDate = Carbon::parse($this->readingPlan->start_date);
@@ -335,6 +341,22 @@ class Dashboard extends Component
         $this->calendarDays = $days;
     }
 
+    public function previousMonth()
+    {
+        $date = Carbon::create($this->calendarYear, $this->calendarMonth, 1)->subMonth();
+        $this->calendarYear = $date->year;
+        $this->calendarMonth = $date->month;
+        $this->generateCalendarDays();
+    }
+
+    public function nextMonth()
+    {
+        $date = Carbon::create($this->calendarYear, $this->calendarMonth, 1)->addMonth();
+        $this->calendarYear = $date->year;
+        $this->calendarMonth = $date->month;
+        $this->generateCalendarDays();
+    }
+
         public function markAsComplete()
     {
         $user = Auth::user();
@@ -343,13 +365,17 @@ class Dashboard extends Component
             return;
         }
         
-        $user = Auth::user();
-        
         // Check if already completed
         if ($this->completedToday) {
             return;
         }
         
+            // Prevent marking a break day
+            if ($this->todayReading->is_break_day) {
+                session()->flash('error', 'Today is a break day. There is no reading to complete.');
+                return;
+            }
+
         // Create progress record
         ReadingProgress::create([
             'user_id' => $user->id,
@@ -358,26 +384,8 @@ class Dashboard extends Component
             'completed_date' => Carbon::today(),
         ]);
         
-        // Update user plan statistics
-        $userPlan = $user->readingPlans()->where('reading_plan_id', $this->readingPlan->id)->first();
-        
-        if ($userPlan && $userPlan->pivot) {
-            // Update streak
-            $currentStreak = $userPlan->pivot->current_streak + 1;
-            
-            // Calculate completion rate
-            $totalDays = $this->todayReading->day_number;
-            $completedDays = ReadingProgress::where('user_id', $user->id)
-                ->where('reading_plan_id', $this->readingPlan->id)
-                ->count();
-            $completionRate = ($completedDays / $totalDays) * 100;
-            
-            // Update pivot record
-            $user->readingPlans()->updateExistingPivot($this->readingPlan->id, [
-                'current_streak' => $currentStreak,
-                'completion_rate' => $completionRate,
-            ]);
-        }
+            // Recompute and update pivot stats (streak + completion rate)
+            $this->recomputeAndUpdatePivotStats($user, $this->readingPlan->id);
         
         // Refresh the component state
         $this->mount();
@@ -544,6 +552,13 @@ class Dashboard extends Component
         
         $user = Auth::user();
         
+        // Prevent marking a break day
+        if ($this->selectedReading->is_break_day) {
+            session()->flash('error', 'Selected day is a break day and cannot be marked as complete.');
+            $this->showCatchUpModal = false;
+            return;
+        }
+
         // Check if already completed
         $alreadyCompleted = ReadingProgress::where('user_id', $user->id)
             ->where('daily_reading_id', $this->selectedReading->id)
@@ -563,20 +578,8 @@ class Dashboard extends Component
             'completed_date' => Carbon::today(),
         ]);
         
-        // Update user plan statistics if pivot exists
-        if ($this->userPlan->pivot) {
-            $completedDays = ReadingProgress::where('user_id', $user->id)
-                ->where('reading_plan_id', $this->readingPlan->id)
-                ->count();
-            
-            $totalDays = $this->userPlan->pivot->current_day;
-            $completionRate = $totalDays > 0 ? ($completedDays / $totalDays) * 100 : 0;
-            
-            // Update pivot record
-            $user->readingPlans()->updateExistingPivot($this->readingPlan->id, [
-                'completion_rate' => $completionRate,
-            ]);
-        }
+        // Recompute and update pivot stats (streak + completion rate)
+        $this->recomputeAndUpdatePivotStats($user, $this->readingPlan->id);
         
         session()->flash('message', 'Day ' . $this->selectedReading->day_number . ' marked as complete!');
         $this->showCatchUpModal = false;
@@ -585,6 +588,58 @@ class Dashboard extends Component
         
         // Refresh the component state
         $this->mount();
+    }
+
+    /**
+     * Recompute current streak and completion rate and update pivot.
+     */
+    protected function recomputeAndUpdatePivotStats($user, $planId)
+    {
+        // Recalculate completion rate and plan-based streak (ignoring calendar dates)
+        $userPlan = $user->readingPlans()->where('reading_plan_id', $planId)->first();
+        if (!$userPlan || !$userPlan->pivot) {
+            return;
+        }
+
+        $currentDay = $userPlan->pivot->current_day;
+        // Completed day_numbers set
+        $completedDayNumbers = ReadingProgress::where('user_id', $user->id)
+            ->where('reading_progress.reading_plan_id', $planId)
+            ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
+            ->pluck('daily_readings.day_number')
+            ->toArray();
+
+        // Map of day_number => is_break_day
+        $daysMap = DailyReading::where('reading_plan_id', $planId)
+            ->where('day_number', '<=', $currentDay)
+            ->orderBy('day_number')
+            ->get(['day_number', 'is_break_day'])
+            ->keyBy('day_number');
+
+        // Completion rate up to current day excluding break days
+        $readingDaysSoFar = $daysMap->filter(fn($d) => !$d->is_break_day)->count();
+        $completedReadingDays = collect($completedDayNumbers)
+            ->filter(fn($dn) => isset($daysMap[$dn]) && !$daysMap[$dn]->is_break_day)
+            ->count();
+        $completionRate = $readingDaysSoFar > 0 ? ($completedReadingDays / $readingDaysSoFar) * 100 : 0;
+
+        // Plan-based streak: count consecutive completed reading days backwards from current_day, skipping break days
+        $streak = 0;
+        for ($d = $currentDay; $d >= 1; $d--) {
+            $day = $daysMap->get($d);
+            if (!$day) { break; }
+            if ($day->is_break_day) { continue; }
+            if (in_array($d, $completedDayNumbers)) {
+                $streak++;
+            } else {
+                break;
+            }
+        }
+
+        $user->readingPlans()->updateExistingPivot($planId, [
+            'current_streak' => $streak,
+            'completion_rate' => $completionRate,
+        ]);
     }
     /**
      * Close the catch-up modal and reset selected reading.

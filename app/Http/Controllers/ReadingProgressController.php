@@ -109,73 +109,124 @@ class ReadingProgressController extends Controller
         ]);
 }
 
-public function quickMark(Request $request)
-{
-    $request->validate([
-        'day_number' => 'required|integer|min:1'
-    ]);
-    
-    $user = Auth::user();
-    $dayNumber = $request->day_number;
-    
-    // Get user's active reading plan
-    $userPlan = $user->readingPlans()
-        ->where('user_reading_plans.is_active', true)
-        ->first();
-        
-    if (!$userPlan) {
-        return back()->with('error', 'No active reading plan found.');
+    public function quickMark(Request $request)
+    {
+        $request->validate([
+            'day_number' => 'nullable|integer|min:1',
+            'day_range' => ['nullable', 'regex:/^\s*\d+\s*-\s*\d+\s*$/'],
+            'apply_catch_up' => 'nullable|boolean',
+        ]);
+
+        $user = Auth::user();
+
+        // Get user's active reading plan
+        $userPlan = $user->readingPlans()
+            ->where('user_reading_plans.is_active', true)
+            ->first();
+
+        if (!$userPlan) {
+            return back()->with('error', 'No active reading plan found.');
+        }
+
+        $currentDay = $userPlan->pivot->current_day;
+
+        // Build list of days to mark
+        $daysToMark = [];
+
+        if ($request->filled('day_range')) {
+            // Parse range like "90-95"
+            [$start, $end] = array_map('intval', preg_split('/\s*-\s*/', $request->day_range));
+            if ($start > $end) {
+                [$start, $end] = [$end, $start];
+            }
+            $end = min($end, $currentDay);
+            $start = max(1, $start);
+            $daysToMark = range($start, $end);
+        } elseif ($request->boolean('apply_catch_up') && $request->filled('day_number')) {
+            // Mark all missed days up to the given day_number (inclusive)
+            $target = min(intval($request->day_number), $currentDay);
+            $daysToMark = range(1, $target);
+        } elseif ($request->filled('day_number')) {
+            $target = intval($request->day_number);
+            if ($target > $currentDay) {
+                return back()->with('error', 'Cannot mark future days as complete.');
+            }
+            $daysToMark = [$target];
+        } else {
+            return back()->with('error', 'Please provide a day number or a day range to mark.');
+        }
+
+        // Fetch readings and filter valid ones (not break days, not already completed)
+        $readings = DailyReading::where('reading_plan_id', $userPlan->id)
+            ->whereIn('day_number', $daysToMark)
+            ->orderBy('day_number')
+            ->get()
+            ->keyBy('day_number');
+
+        $already = 0; $breaks = 0; $created = 0; $notFound = 0;
+
+        foreach ($daysToMark as $day) {
+            $reading = $readings->get($day);
+            if (!$reading) { $notFound++; continue; }
+            if ($reading->is_break_day) { $breaks++; continue; }
+            
+            $exists = ReadingProgress::where('user_id', $user->id)
+                ->where('daily_reading_id', $reading->id)
+                ->exists();
+            if ($exists) { $already++; continue; }
+
+            ReadingProgress::create([
+                'user_id' => $user->id,
+                'reading_plan_id' => $userPlan->id,
+                'daily_reading_id' => $reading->id,
+                'completed_date' => Carbon::today(),
+            ]);
+            $created++;
+        }
+
+        // Recompute completion rate up to current day excluding break days
+        $readingDaysSoFar = DailyReading::where('reading_plan_id', $userPlan->id)
+            ->where('is_break_day', false)
+            ->where('day_number', '<=', $currentDay)
+            ->count();
+        $completedDays = ReadingProgress::where('user_id', $user->id)
+            ->where('reading_plan_id', $userPlan->id)
+            ->count();
+        $completionRate = $readingDaysSoFar > 0 ? ($completedDays / $readingDaysSoFar) * 100 : 0;
+
+        // Plan-based streak: consecutive completed reading days from current_day (skip breaks)
+        $completedDayNumbers = ReadingProgress::where('user_id', $user->id)
+            ->where('reading_progress.reading_plan_id', $userPlan->id)
+            ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
+            ->pluck('daily_readings.day_number')
+            ->toArray();
+        $daysMap = DailyReading::where('reading_plan_id', $userPlan->id)
+            ->where('day_number', '<=', $currentDay)
+            ->orderBy('day_number')
+            ->get(['day_number', 'is_break_day'])
+            ->keyBy('day_number');
+        $streak = 0;
+        for ($d = $currentDay; $d >= 1; $d--) {
+            $day = $daysMap->get($d);
+            if (!$day) { break; }
+            if ($day->is_break_day) { continue; }
+            if (in_array($d, $completedDayNumbers)) { $streak++; } else { break; }
+        }
+
+        $user->readingPlans()->updateExistingPivot($userPlan->id, [
+            'completion_rate' => $completionRate,
+            'current_streak' => $streak,
+        ]);
+
+        $msgParts = [];
+        if ($created) $msgParts[] = "$created day(s) marked";
+        if ($already) $msgParts[] = "$already already completed";
+        if ($breaks) $msgParts[] = "$breaks break day(s) skipped";
+        if ($notFound) $msgParts[] = "$notFound not found";
+        $summary = implode(', ', $msgParts);
+
+        return back()->with('success', $summary ?: 'No changes made.');
     }
-    
-    // Validate day number
-    if ($dayNumber > $userPlan->pivot->current_day) {
-        return back()->with('error', 'Cannot mark future days as complete.');
-    }
-    
-    // Find the daily reading
-    $dailyReading = DailyReading::where('reading_plan_id', $userPlan->id)
-        ->where('day_number', $dayNumber)
-        ->first();
-        
-    if (!$dailyReading) {
-        return back()->with('error', "Day {$dayNumber} not found in reading plan.");
-    }
-    
-    if ($dailyReading->is_break_day) {
-        return back()->with('error', "Day {$dayNumber} is a break day.");
-    }
-    
-    // Check if already completed
-    $alreadyCompleted = ReadingProgress::where('user_id', $user->id)
-        ->where('daily_reading_id', $dailyReading->id)
-        ->exists();
-        
-    if ($alreadyCompleted) {
-        return back()->with('error', "Day {$dayNumber} is already completed.");
-    }
-    
-    // Mark as complete
-    ReadingProgress::create([
-        'user_id' => $user->id,
-        'reading_plan_id' => $userPlan->id,
-        'daily_reading_id' => $dailyReading->id,
-        'completed_date' => Carbon::today(),
-    ]);
-    
-    // Update completion rate
-    $completedDays = ReadingProgress::where('user_id', $user->id)
-        ->where('reading_plan_id', $userPlan->id)
-        ->count();
-        
-    $totalDays = $userPlan->pivot->current_day;
-    $completionRate = ($completedDays / $totalDays) * 100;
-    
-    $user->readingPlans()->updateExistingPivot($userPlan->id, [
-        'completion_rate' => $completionRate,
-    ]);
-    
-    return back()->with('success', "Day {$dayNumber} ({$dailyReading->reading_range}) marked as complete!");
-}
 
 
 }

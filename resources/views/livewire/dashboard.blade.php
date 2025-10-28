@@ -120,13 +120,14 @@
 
           </div>
 
-   <!-- Existing Quick Mark Complete Form -->
+   <!-- Enhanced Quick Mark Complete Form -->
 <div class="bg-white rounded-lg shadow p-6 mb-6">
-  <h3 class="font-bold text-lg mb-4 text-gray-700">Quick Mark Complete</h3>
-  
-  <form action="{{ route('reading.quick-mark') }}" method="POST" class="flex items-end space-x-3">
+  <h3 class="font-bold text-lg mb-2 text-gray-700">Quick Mark Complete</h3>
+  <p class="text-sm text-gray-500 mb-4">Enter a single day (e.g., 60) or a range (e.g., 60-75). You can also catch up all missed days up to a specific day.</p>
+
+  <form action="{{ route('reading.quick-mark') }}" method="POST" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
       @csrf
-      <div class="flex-1">
+      <div class="md:col-span-2">
           <label for="day_number" class="block text-sm font-medium text-gray-700 mb-1">
               Day Number (1 to {{ $userPlan->pivot->current_day }})
           </label>
@@ -137,18 +138,44 @@
               min="1" 
               max="{{ $userPlan->pivot->current_day }}"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Enter day number"
-              required
+              placeholder="e.g., 60"
           >
       </div>
-      <button 
-          type="submit" 
-          class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-md transition">
-          Mark Complete
-      </button>
+
+      <div class="md:col-span-2">
+          <label for="day_range" class="block text-sm font-medium text-gray-700 mb-1">
+              Day Range (optional)
+          </label>
+          <input 
+              type="text" 
+              name="day_range" 
+              id="day_range"
+              pattern="^\s*\d+\s*-\s*\d+\s*$"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="e.g., 60-75"
+          >
+      </div>
+
+      <div class="md:col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Catch Up</label>
+          <label class="inline-flex items-center text-sm text-gray-700">
+              <input type="checkbox" name="apply_catch_up" value="1" class="mr-2 rounded">
+              Mark all missed up to day
+          </label>
+      </div>
+
+      <div class="md:col-span-5 flex justify-end">
+          <button 
+              type="submit" 
+              class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-md transition">
+              Mark Complete
+          </button>
+      </div>
   </form>
-  
-  
+
+  <div class="mt-3 text-xs text-gray-500">
+      Notes: Break days are automatically skipped. Already completed days are ignored.
+  </div>
 </div>
 
 
@@ -270,7 +297,15 @@
 
               <!-- Progress Calendar -->
               <div class="bg-white rounded-lg shadow p-6 col-span-1 md:col-span-2">
-                  <h3 class="font-bold text-lg mb-4 text-gray-700">{{ now()->format('F Y') }}</h3>
+                  <div class="flex items-center justify-between mb-4">
+                      <h3 class="font-bold text-lg text-gray-700">
+                          {{ \Carbon\Carbon::create($calendarYear, $calendarMonth, 1)->format('F Y') }}
+                      </h3>
+                      <div class="space-x-2">
+                          <button wire:click="previousMonth" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Prev</button>
+                          <button wire:click="nextMonth" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Next</button>
+                      </div>
+                  </div>
                   <div class="grid grid-cols-7 gap-2 text-center">
                       <div class="text-xs font-medium text-gray-500">Sun</div>
                       <div class="text-xs font-medium text-gray-500">Mon</div>
@@ -283,7 +318,7 @@
                       <!-- Calendar days -->
                       @if($calendarDays && count($calendarDays) > 0)
                           @foreach($calendarDays as $day)
-                              <div class="h-10 w-10 rounded-full flex items-center justify-center 
+                              <div wire:key="cal-{{ $day['date']->format('Y-m-d') }}" class="h-10 w-10 rounded-full flex items-center justify-center 
                                   {{ !$day['is_current_month'] ? 'text-gray-400' : 'text-gray-600' }}
                                   {{ $day['is_break_day'] && !$day['is_future'] ? 'bg-gray-200' : '' }}
                                   {{ $day['is_completed'] ? 'bg-green-500 text-white' : '' }}
@@ -490,20 +525,4 @@
       </div>
   @endif
 </div>
-
-<script>
-  // Auto-hide flash messages after 5 seconds
-  document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(function() {
-          const alerts = document.querySelectorAll('[role="alert"]');
-          alerts.forEach(function(alert) {
-              alert.style.transition = 'opacity 0.5s';
-              alert.style.opacity = '0';
-              setTimeout(function() {
-                  alert.remove();
-              }, 500);
-          });
-      }, 5000);
-  });
-</script>
 
