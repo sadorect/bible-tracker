@@ -19,7 +19,19 @@ class RegisteredUserController extends Controller
      */
     public function create(): View
     {
-        return view('auth.register');
+        // Generate simple math captcha (register)
+        $a = random_int(1, 9);
+        $b = random_int(1, 9);
+        session([
+            'captcha_register_a' => $a,
+            'captcha_register_b' => $b,
+            'captcha_register_sum' => $a + $b,
+        ]);
+
+        return view('auth.register', [
+            'captchaA' => $a,
+            'captchaB' => $b,
+        ]);
     }
 
     /**
@@ -29,6 +41,21 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Validate captcha first
+        $request->validate([
+            'captcha_answer' => ['required','integer'],
+        ], [
+            'captcha_answer.required' => 'Please answer the math question.',
+        ]);
+
+        $answer = (int) $request->input('captcha_answer');
+        $expected = (int) session('captcha_register_sum');
+        if ($answer !== $expected) {
+            return back()
+                ->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])
+                ->withInput();
+        }
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
@@ -44,6 +71,9 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
 
         Auth::login($user);
+
+        // Invalidate captcha after successful registration
+        session()->forget(['captcha_register_a', 'captcha_register_b', 'captcha_register_sum']);
 
         return redirect(route('dashboard', absolute: false));
     }

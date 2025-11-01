@@ -26,8 +26,39 @@
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
+        <!-- Simple Captcha -->
+        <div class="mt-2">
+            <x-input-label for="captcha_answer" :value="__('Prove you\'re human')" />
+            <div class="mt-1 flex items-center gap-3">
+                <span class="text-sm text-gray-700 dark:text-gray-300">
+                    What is <strong id="capPwReqA">{{ $captchaA ?? session('captcha_pwreq_a') }}</strong> + <strong id="capPwReqB">{{ $captchaB ?? session('captcha_pwreq_b') }}</strong>?
+                </span>
+                <button type="button" id="refreshCaptchaPwReq" class="text-xs text-emerald-700 dark:text-emerald-300 hover:underline">Refresh</button>
+            </div>
+            <x-text-input id="captcha_answer" class="block mt-2 w-full" type="number" name="captcha_answer" :value="old('captcha_answer')" required />
+            <x-input-error :messages="$errors->get('captcha_answer')" class="mt-2" />
+        </div>
+
         <x-primary-button class="w-full justify-center bg-emerald-600 hover:bg-emerald-700">
             {{ __('Send reset link') }}
         </x-primary-button>
     </form>
 </x-guest-layout>
+
+@push('scripts')
+<script>
+document.getElementById('refreshCaptchaPwReq')?.addEventListener('click', async () => {
+    try {
+        const res = await fetch('{{ route('captcha.refresh') }}?for=password-request', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            cache: 'no-store'
+        });
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
+        document.getElementById('capPwReqA').textContent = data.a;
+        document.getElementById('capPwReqB').textContent = data.b;
+    } catch (e) { console.warn('Failed to refresh captcha'); }
+});
+</script>
+@endpush

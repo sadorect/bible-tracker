@@ -9,6 +9,8 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\Auth\PhoneLoginController;
+use App\Http\Controllers\Auth\CaptchaController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -22,6 +24,10 @@ Route::middleware('guest')->group(function () {
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
+    // Phone login routes
+    Route::get('phone-login', [PhoneLoginController::class, 'showLoginForm'])->name('phone.login.form');
+    Route::post('phone-login', [PhoneLoginController::class, 'login'])->name('phone.login');
+
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
@@ -33,6 +39,9 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    // Captcha refresh
+    Route::post('captcha/refresh', [CaptchaController::class, 'refresh'])->name('captcha.refresh');
 });
 
 Route::middleware('auth')->group(function () {

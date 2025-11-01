@@ -19,7 +19,16 @@ class NewPasswordController extends Controller
      */
     public function create(Request $request): View
     {
-        return view('auth.reset-password', ['request' => $request]);
+        // Generate simple math captcha (password reset form)
+        $a = random_int(1, 9);
+        $b = random_int(1, 9);
+        session([
+            'captcha_pwreset_a' => $a,
+            'captcha_pwreset_b' => $b,
+            'captcha_pwreset_sum' => $a + $b,
+        ]);
+
+        return view('auth.reset-password', ['request' => $request, 'captchaA' => $a, 'captchaB' => $b]);
     }
 
     /**
@@ -29,6 +38,19 @@ class NewPasswordController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Validate captcha first
+        $request->validate([
+            'captcha_answer' => ['required','integer'],
+        ], [
+            'captcha_answer.required' => 'Please answer the math question.',
+        ]);
+
+        $answer = (int) $request->input('captcha_answer');
+        $expected = (int) session('captcha_pwreset_sum');
+        if ($answer !== $expected) {
+            return back()->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])->withInput();
+        }
+
         $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],

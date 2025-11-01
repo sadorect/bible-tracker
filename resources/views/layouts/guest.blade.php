@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ config('app.name', 'Bible-Reader') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -13,6 +13,7 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @stack('scripts')
     </head>
     <body class="font-sans text-gray-900 antialiased bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50 dark:from-gray-950 dark:via-teal-950 dark:to-emerald-950">
         <style>
@@ -66,5 +67,6 @@
                 </div>
             @endif
         </div>
+        
     </body>
 </html>

@@ -15,7 +15,19 @@ class PasswordResetLinkController extends Controller
      */
     public function create(): View
     {
-        return view('auth.forgot-password');
+        // Generate simple math captcha (password reset request)
+        $a = random_int(1, 9);
+        $b = random_int(1, 9);
+        session([
+            'captcha_pwreq_a' => $a,
+            'captcha_pwreq_b' => $b,
+            'captcha_pwreq_sum' => $a + $b,
+        ]);
+
+        return view('auth.forgot-password', [
+            'captchaA' => $a,
+            'captchaB' => $b,
+        ]);
     }
 
     /**
@@ -25,6 +37,19 @@ class PasswordResetLinkController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Validate captcha first
+        $request->validate([
+            'captcha_answer' => ['required','integer'],
+        ], [
+            'captcha_answer.required' => 'Please answer the math question.',
+        ]);
+
+        $answer = (int) $request->input('captcha_answer');
+        $expected = (int) session('captcha_pwreq_sum');
+        if ($answer !== $expected) {
+            return back()->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])->withInput();
+        }
+
         $request->validate([
             'email' => ['required', 'email'],
         ]);
