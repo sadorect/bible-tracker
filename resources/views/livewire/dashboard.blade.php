@@ -1,528 +1,576 @@
 <div>
-  @if($userPlan && $userPlan->pivot)
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <!-- Navigation indicator (only show if viewing a different day) -->
-          @if($viewingDay && $viewingDay != $userPlan->pivot->current_day)
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                  <div class="flex items-center justify-between">
-                      <div class="flex items-center">
-                          <svg class="h-5 w-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                          </svg>
-                          <span class="text-blue-800 font-medium">
-                              You're viewing Day {{ $viewingDay }} 
-                              @if($viewingDay < $userPlan->pivot->current_day)
-                                  (Previous Day)
-                              @else
-                                  (Future Day)
-                              @endif
-                          </span>
-                      </div>
-                      <button wire:click="resetToToday" class="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                          Return to Today (Day {{ $userPlan->pivot->current_day }})
-                      </button>
-                  </div>
-              </div>
-          @endif
-          @if(session('success'))
-          <div class="mt-3 bg-green-50 border border-green-200 rounded-md p-3">
-              <p class="text-sm text-green-600">{{ session('success') }}</p>
-          </div>
-      @endif
-      
-      @if(session('error'))
-          <div class="mt-3 bg-red-50 border border-red-200 rounded-md p-3">
-              <p class="text-sm text-red-600">{{ session('error') }}</p>
-          </div>
-      @endif
-          <!-- Today's Reading Card (Featured) -->
-          <div class="bg-white rounded-lg shadow-lg p-6 border-l-4 border-blue-600 mb-8">
-              <div class="flex justify-between items-center mb-4">
-                  <h2 class="text-lg text-blue-800 font-bold">
-                      @if($viewingDay && $viewingDay != $userPlan->pivot->current_day)
-                          DAY {{ $viewingDay }} READING
-                      @else
-                          TODAY'S READING
-                      @endif
-                  </h2>
-                  <span class="bg-blue-100 text-blue-800 font-medium py-1 px-3 rounded-full text-sm">
-                      DAY {{ $viewingDay ?? $userPlan->pivot->current_day }}
-                  </span>
-              </div>
-              <div class="text-center py-4">
-                  @if($viewingReading && $viewingReading->is_break_day)
-                      <h1 class="text-4xl font-bold text-gray-800 mb-2">Break Day</h1>
-                      <p class="text-gray-600">Take a day to reflect on your readings so far</p>
-                                      @elseif($viewingReading)
-                      <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ $viewingReading->reading_range }}</h1>
-                      <p class="text-gray-600">{{ $readingPlan->type == 'old_testament' ? 'Old Testament' : 'New Testament' }} Reading Plan</p>
-                  @else
-                      <h1 class="text-4xl font-bold text-gray-800 mb-2">No reading assigned</h1>
-                      <p class="text-gray-600">Please check back later</p>
-                  @endif
-              </div>
-              
-              @if($viewingReading && !$viewingReading->is_break_day && $viewingChapters && count($viewingChapters) > 0)
-                  <div class="mt-4 text-left">
-                      <h3 class="text-sm font-medium text-gray-700 mb-2">Chapters to Read:</h3>
-                      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          @foreach($viewingChapters as $chapter)
-                              @if(Route::has('bible.chapter'))
-                                  <a href="{{ route('bible.chapter', [$chapter->book_name, $chapter->chapter_number]) }}"                              
-                                     class="bg-blue-50 hover:bg-blue-100 rounded-md p-2 text-center transition-colors">
-                                      <span class="text-sm font-medium text-blue-700">{{ $chapter->book_name }} {{ $chapter->chapter_number }}</span>
-                                  </a>
-                              @else
-                                  <div class="bg-blue-50 rounded-md p-2 text-center">
-                                      <span class="text-sm font-medium text-blue-700">{{ $chapter->book_name }} {{ $chapter->chapter_number }}</span>
-                                  </div>
-                              @endif
-                          @endforeach
-                      </div>
-                  </div>
-              @endif
-              
-              <div class="flex justify-center mt-4 space-x-3">
-                  @if($viewingDay && $viewingDay == $userPlan->pivot->current_day)
-                      <!-- Current day actions -->
-                      @if($completedToday)
-                          <button class="bg-green-200 text-green-800 font-bold py-2 px-6 rounded-lg cursor-default">
-                              <i class="fas fa-check mr-2"></i> Completed
-                          </button>
-                      @elseif($todayReading && !$todayReading->is_break_day) 
-                         <button wire:click="markAsComplete" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
-                              Mark as Complete
-                          </button>
-                      @endif
-                  @elseif($viewingDay && $viewingDay < $userPlan->pivot->current_day)
-                      <!-- Previous day actions -->
-                      @if($viewingCompleted)
-                          <button class="bg-green-200 text-green-800 font-bold py-2 px-6 rounded-lg cursor-default">
-                              <i class="fas fa-check mr-2"></i> Completed
-                          </button>
-                      @elseif($viewingReading && !$viewingReading->is_break_day)
-                          <button wire:click="markPreviousAsComplete" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
-                              Mark as Complete (Catch Up)
-                          </button>
-                      @endif
-                  @endif
-                  
-                  <!-- Catch up button (only show on current day if there are missed readings) -->
-                  @if($viewingDay && $viewingDay == $userPlan->pivot->current_day)
-                      <button wire:click="showCatchUpOptions" 
-                              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition">
-                          <i class="fas fa-clock mr-2"></i>
-                          Catch Up on Missed Days
-                      </button>
-                  @endif
-              </div>
-          </div>
+    @if($userPlan && $userPlan->pivot)
+        @php
+            $activeDay = (int) $userPlan->pivot->current_day;
+            $completionRate = number_format($userPlan->pivot->completion_rate ?? 0, 0);
+            $completedHistoryCount = collect($readingHistory)->where('completed', true)->count();
+            $assignedDate = $viewingReading
+                ? (($readingPlan->reading_start_date ?? $readingPlan->start_date)?->copy()->addDays($viewingReading->day_number - 1))
+                : null;
+        @endphp
 
-          </div>
+        <div class="space-y-6">
+            @if($viewingDay && $viewingDay !== $activeDay)
+                <div class="rounded-[1.75rem] border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-900 shadow-sm shadow-sky-900/5">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                                <i class="fas fa-compass"></i>
+                            </span>
+                            <div>
+                                <p class="font-semibold">You are viewing Day {{ $viewingDay }}.</p>
+                                <p class="mt-1 text-sky-800/80">
+                                    {{ $viewingDay < $activeDay ? 'This helps with catch-up on a missed assignment.' : 'This is a read-ahead view for faster progress.' }}
+                                </p>
+                            </div>
+                        </div>
+                        <button wire:click="resetToToday" class="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700">
+                            Return to Scheduled Day {{ $activeDay }}
+                        </button>
+                    </div>
+                </div>
+            @endif
 
-   <!-- Enhanced Quick Mark Complete Form -->
-<div class="bg-white rounded-lg shadow p-6 mb-6">
-  <h3 class="font-bold text-lg mb-2 text-gray-700">Quick Mark Complete</h3>
-  <p class="text-sm text-gray-500 mb-4">Enter a single day (e.g., 60) or a range (e.g., 60-75). You can also catch up all missed days up to a specific day.</p>
+            @if($isTrainingStage)
+                <section class="overflow-hidden rounded-[2rem] border border-amber-200 bg-white shadow-xl shadow-slate-900/5">
+                    <div class="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(16rem,0.7fr)] lg:px-8">
+                        <div class="space-y-5">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">Training Stage</span>
+                                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                    Day {{ max($trainingDayNumber, 1) }} of {{ max(count($trainingResources), 1) }}
+                                </span>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-semibold tracking-tight text-slate-900">Build the rhythm before the readings open.</h2>
+                                <p class="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+                                    Every uploaded training resource extends the onboarding window. Complete each one, then your reading schedule opens on
+                                    <span class="font-semibold text-slate-900">{{ $readingPlan->reading_start_date?->format('M d, Y') ?? 'the scheduled reading date' }}</span>.
+                                </p>
+                            </div>
+                            <div class="grid gap-4 sm:grid-cols-3">
+                                <div class="rounded-[1.5rem] bg-stone-50 p-4">
+                                    <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Training starts</p>
+                                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $readingPlan->start_date?->format('M d, Y') ?? 'TBD' }}</p>
+                                </div>
+                                <div class="rounded-[1.5rem] bg-stone-50 p-4">
+                                    <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Reading opens</p>
+                                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ $readingPlan->reading_start_date?->format('M d, Y') ?? 'After training' }}</p>
+                                </div>
+                                <div class="rounded-[1.5rem] bg-stone-50 p-4">
+                                    <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Resources</p>
+                                    <p class="mt-2 text-lg font-semibold text-slate-900">{{ count($trainingResources) }}</p>
+                                </div>
+                            </div>
+                        </div>
 
-  <form action="{{ route('reading.quick-mark') }}" method="POST" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-      @csrf
-      <div class="md:col-span-2">
-          <label for="day_number" class="block text-sm font-medium text-gray-700 mb-1">
-              Day Number (1 to {{ $userPlan->pivot->current_day }})
-          </label>
-          <input 
-              type="number" 
-              name="day_number" 
-              id="day_number"
-              min="1" 
-              max="{{ $userPlan->pivot->current_day }}"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., 60"
-          >
-      </div>
+                        <div class="rounded-[1.75rem] bg-gradient-to-br from-amber-500 to-orange-500 p-6 text-white shadow-lg shadow-amber-600/20">
+                            <p class="text-xs uppercase tracking-[0.24em] text-amber-100">Progress</p>
+                            <p class="mt-3 text-4xl font-semibold">{{ collect($trainingResources)->where('completed', true)->count() }}/{{ max(count($trainingResources), 1) }}</p>
+                            <p class="mt-2 text-sm text-amber-50">Completed training resources</p>
+                            @if($trainingComplete && ! $readingUnlocked)
+                                <p class="mt-6 rounded-2xl bg-white/15 px-4 py-3 text-sm text-white/90">Training is complete. Your reading journey unlocks on the scheduled start date.</p>
+                            @endif
+                        </div>
+                    </div>
 
-      <div class="md:col-span-2">
-          <label for="day_range" class="block text-sm font-medium text-gray-700 mb-1">
-              Day Range (optional)
-          </label>
-          <input 
-              type="text" 
-              name="day_range" 
-              id="day_range"
-              pattern="^\s*\d+\s*-\s*\d+\s*$"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., 60-75"
-          >
-      </div>
+                    <div class="border-t border-amber-100 bg-amber-50/50 px-6 py-6 lg:px-8">
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            @forelse($trainingResources as $resource)
+                                <article class="rounded-[1.5rem] border border-amber-100 bg-white p-5 shadow-sm shadow-amber-900/5">
+                                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="space-y-2">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-slate-700">Training Day {{ $resource['day_number'] }}</span>
+                                                <span class="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">{{ $resource['type_label'] }}</span>
+                                            </div>
+                                            <h3 class="text-lg font-semibold text-slate-900">{{ $resource['title'] }}</h3>
+                                            @if($resource['description'])
+                                                <p class="text-sm leading-6 text-slate-600">{{ $resource['description'] }}</p>
+                                            @endif
+                                        </div>
 
-      <div class="md:col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Catch Up</label>
-          <label class="inline-flex items-center text-sm text-gray-700">
-              <input type="checkbox" name="apply_catch_up" value="1" class="mr-2 rounded">
-              Mark all missed up to day
-          </label>
-      </div>
+                                        <div class="flex flex-col gap-2 sm:items-end">
+                                            <div class="flex flex-wrap gap-2 sm:justify-end">
+                                                @if($resource['video_link'])
+                                                    <a href="{{ $resource['video_link'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">
+                                                        Open Video
+                                                    </a>
+                                                @endif
+                                                @if($resource['document_link'])
+                                                    <a href="{{ $resource['document_link'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-stone-50">
+                                                        Open PDF
+                                                    </a>
+                                                @endif
+                                            </div>
 
-      <div class="md:col-span-5 flex justify-end">
-          <button 
-              type="submit" 
-              class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-md transition">
-              Mark Complete
-          </button>
-      </div>
-  </form>
+                                            @if($resource['completed'])
+                                                <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                    Completed{{ $resource['completed_at'] ? ' '.$resource['completed_at']->format('M d') : '' }}
+                                                </span>
+                                            @else
+                                                <button wire:click="markTrainingResourceComplete({{ $resource['id'] }})" class="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700">
+                                                    Mark Complete
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="rounded-[1.5rem] border border-dashed border-amber-200 bg-white px-6 py-10 text-center text-sm text-slate-500 lg:col-span-2">
+                                    No training resources have been added to this cohort yet.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </section>
+            @else
+                <section class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.8fr)]">
+                    <article class="overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-slate-900/5">
+                        <div class="border-b border-stone-200 px-6 py-5 lg:px-8">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <div class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                                        {{ $viewingDay && $viewingDay !== $activeDay ? 'Viewing Day '.$viewingDay : 'Today’s Assignment' }}
+                                    </div>
+                                    <h2 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                                        @if($viewingReading && $viewingReading->is_break_day)
+                                            Refresh & Prayer Break
+                                        @elseif($viewingReading)
+                                            {{ $viewingReading->reading_range }}
+                                        @else
+                                            No reading assigned
+                                        @endif
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-7 text-slate-600">
+                                        @if($viewingReading && $viewingReading->is_break_day)
+                                            This is your scheduled pause after the current reading streak. Reflect, pray, and prepare for the next stretch.
+                                        @elseif($viewingReading)
+                                            {{ $readingPlan->type_label }} plan. {{ $readingPlan->cadence_description }}.
+                                        @else
+                                            Please check back later for the next assignment.
+                                        @endif
+                                    </p>
+                                </div>
 
-  <div class="mt-3 text-xs text-gray-500">
-      Notes: Break days are automatically skipped. Already completed days are ignored.
-  </div>
-</div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div class="rounded-[1.5rem] bg-stone-50 px-4 py-3">
+                                        <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Scheduled day</p>
+                                        <p class="mt-2 text-2xl font-semibold text-slate-900">Day {{ $viewingDay ?? $activeDay }}</p>
+                                    </div>
+                                    <div class="rounded-[1.5rem] bg-stone-50 px-4 py-3">
+                                        <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Assigned date</p>
+                                        <p class="mt-2 text-lg font-semibold text-slate-900">{{ $assignedDate?->format('M d, Y') ?? 'TBD' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
+                        <div class="space-y-6 px-6 py-6 lg:px-8">
+                            @if($viewingReading && ! $viewingReading->is_break_day && $viewingChapters && count($viewingChapters) > 0)
+                                <div>
+                                    <div class="mb-3 flex items-center justify-between">
+                                        <h3 class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Chapters</h3>
+                                        <span class="text-sm text-slate-500">{{ count($viewingChapters) }} assigned</span>
+                                    </div>
+                                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                        @foreach($viewingChapters as $chapter)
+                                            @if(Route::has('bible.chapter'))
+                                                <a href="{{ route('bible.chapter', [$chapter->book_name, $chapter->chapter_number]) }}" class="rounded-[1.35rem] border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-800">
+                                                    {{ $chapter->book_name }} {{ $chapter->chapter_number }}
+                                                </a>
+                                            @else
+                                                <div class="rounded-[1.35rem] border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-medium text-slate-800">
+                                                    {{ $chapter->book_name }} {{ $chapter->chapter_number }}
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
 
-<!-- Modal with JavaScript control -->
-<div id="quickMarkModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
-  <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-      <!-- Modal content here -->
-      <div class="mt-3">
-          <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-medium text-gray-900">Quick Mark Day Complete</h3>
-              <button onclick="closeQuickMarkModal()" class="text-gray-400 hover:text-gray-600">
-                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-              </button>
-          </div>
-          
-          <div class="space-y-4">
-              <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">
-                      Enter Day Number
-                  </label>
-                  <input 
-                      type="number" 
-                      wire:model="quickMarkDay"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="e.g., 5"
-                  >
-              </div>
-          </div>
-          
-          <div class="mt-6 flex justify-end space-x-3">
-              <button onclick="closeQuickMarkModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                  Cancel
-              </button>
-              <button wire:click="quickMarkComplete" class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700">
-                  Mark Complete
-              </button>
-          </div>
-      </div>
-  </div>
-</div>
+                            <div class="flex flex-wrap gap-3">
+                                @if($viewingDay && $viewingDay === $activeDay)
+                                    @if($completedToday)
+                                        <span class="inline-flex items-center rounded-2xl bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-700">
+                                            <i class="fas fa-check mr-2"></i>
+                                            Today completed
+                                        </span>
+                                    @elseif($todayReading && ! $todayReading->is_break_day)
+                                        <button wire:click="markAsComplete" class="inline-flex items-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                            Mark Today Complete
+                                        </button>
+                                    @endif
+                                @elseif($viewingDay && $viewingDay < $activeDay)
+                                    @if($viewingCompleted)
+                                        <span class="inline-flex items-center rounded-2xl bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-700">
+                                            <i class="fas fa-check mr-2"></i>
+                                            Catch-up complete
+                                        </span>
+                                    @elseif($viewingReading && ! $viewingReading->is_break_day)
+                                        <button wire:click="markViewingDayAsComplete" class="inline-flex items-center rounded-2xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-amber-700">
+                                            Mark Catch-up Complete
+                                        </button>
+                                    @endif
+                                @elseif($viewingDay && $viewingDay > $activeDay)
+                                    @if($viewingCompleted)
+                                        <span class="inline-flex items-center rounded-2xl bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-700">
+                                            <i class="fas fa-check mr-2"></i>
+                                            Read-ahead complete
+                                        </span>
+                                    @elseif($viewingReading && ! $viewingReading->is_break_day)
+                                        <button wire:click="markViewingDayAsComplete" class="inline-flex items-center rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700">
+                                            Mark Read-ahead Complete
+                                        </button>
+                                    @endif
+                                @endif
 
-<script>
-  // Listen for Livewire events
-  document.addEventListener('livewire:init', () => {
-      Livewire.on('show-quick-mark-modal', () => {
-          document.getElementById('quickMarkModal').classList.remove('hidden');
-      });
-      
-      Livewire.on('hide-quick-mark-modal', () => {
-          document.getElementById('quickMarkModal').classList.add('hidden');
-      });
-  });
-  
-  function closeQuickMarkModal() {
-      document.getElementById('quickMarkModal').classList.add('hidden');
-  }
-</script>
-
-          <!-- Day Navigation -->
-          <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
-            <div class="flex justify-between items-center mb-2">
-                <h2 class="text-lg text-blue-800 font-bold">NAVIGATE DAYS</h2>
-                @if($viewingDay != $userPlan->pivot->current_day)
-                    <button wire:click="resetToToday" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm">
-                        Back to Today
-                    </button>
-                @endif
-            </div>
-            
-            <div class="relative">
-                <div class="flex overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-blue-100">
-                    @foreach($nearbyDays as $day)
-                        <div wire:click="viewDay({{ $day['day'] }})" 
-                            class="flex-shrink-0 mx-1 cursor-pointer {{ $day['is_current'] ? 'border-2 border-blue-600 bg-blue-600 text-white' : '' }}">
-                            <div class="w-24 h-24 rounded-lg {{ $day['is_break_day'] ? 'bg-gray-200' : 'bg-white border' }} 
-                                {{ $day['completed'] ? 'border-green-500' : '' }} 
-                                {{ $day['is_today'] ? 'border-blue-600' : 'border-gray-200' }} 
-                                flex flex-col items-center justify-center p-2">
-                                <span class="text-xs font-medium {{ $day['is_today'] ? 'text-blue-600' : 'text-gray-500' }}">DAY</span>
-                                <span class="text-xl font-bold {{ $day['is_today'] ? 'text-blue-600' : 'text-gray-800' }}">{{ $day['day'] }}</span>
-                                @if($day['completed'])
-                                    <span class="mt-1 text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">Completed</span>
-                                @elseif(!$day['completed'] && !$day['is_current'] )
-                                    <span class="mt-1 text-xs px-2 py-0.5 bg-red-100 text-red-800 rounded-full">Pending</span>
-                                @elseif($day['is_break_day'])
-                                    <span class="mt-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-800 rounded-full">Break Day</span>
+                                @if($viewingDay && $viewingDay === $activeDay && $readingUnlocked)
+                                    <button wire:click="showCatchUpOptions" class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-stone-50">
+                                        <i class="fas fa-rotate-left mr-2 text-slate-500"></i>
+                                        Catch up on missed days
+                                    </button>
                                 @endif
                             </div>
                         </div>
-                    @endforeach
+                    </article>
+
+                    <aside class="space-y-6">
+                        <div class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-emerald-600 to-teal-700 p-6 text-white shadow-xl shadow-emerald-900/10">
+                            <p class="text-xs uppercase tracking-[0.24em] text-emerald-100">Journey Snapshot</p>
+                            <div class="mt-4 grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+                                <div>
+                                    <p class="text-sm text-emerald-100">Current streak</p>
+                                    <p class="mt-1 text-3xl font-semibold">{{ $userPlan->pivot->current_streak ?? 0 }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-emerald-100">Completion rate</p>
+                                    <p class="mt-1 text-3xl font-semibold">{{ $completionRate }}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-emerald-100">Next break</p>
+                                    <p class="mt-1 text-3xl font-semibold">{{ $nextBreakDays ?? 0 }}</p>
+                                    <p class="text-xs text-emerald-50">days away</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs uppercase tracking-[0.24em] text-slate-500">Cycle</p>
+                                    <h3 class="mt-2 text-xl font-semibold text-slate-900">Reading cadence</h3>
+                                </div>
+                                <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                    {{ $readingPlan->streak_days }} on / {{ $readingPlan->break_days }} off
+                                </span>
+                            </div>
+                            <div class="mt-5 grid gap-3">
+                                <div class="rounded-[1.35rem] bg-stone-50 px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Reading start</p>
+                                    <p class="mt-2 text-base font-semibold text-slate-900">{{ ($readingPlan->reading_start_date ?? $readingPlan->start_date)?->format('M d, Y') ?? 'TBD' }}</p>
+                                </div>
+                                <div class="rounded-[1.35rem] bg-stone-50 px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Plan end</p>
+                                    <p class="mt-2 text-base font-semibold text-slate-900">{{ $readingPlan->end_date?->format('M d, Y') ?? 'TBD' }}</p>
+                                </div>
+                                <div class="rounded-[1.35rem] bg-stone-50 px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Recently completed</p>
+                                    <p class="mt-2 text-base font-semibold text-slate-900">{{ $completedHistoryCount }} of last {{ count($readingHistory) }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                            <h3 class="text-lg font-semibold text-slate-900">Quick mark completion</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">
+                                Enter a single day or a range. Catch-up respects the current schedule, while day/range entry can include read-ahead progress.
+                            </p>
+
+                            <form action="{{ route('reading.quick-mark') }}" method="POST" class="mt-5 space-y-4">
+                                @csrf
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label for="day_number" class="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Day number</label>
+                                        <input
+                                            type="number"
+                                            name="day_number"
+                                            id="day_number"
+                                            min="1"
+                                            max="{{ $readingPlan->duration_days }}"
+                                            class="mt-2 w-full rounded-2xl border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="e.g. 18"
+                                        >
+                                    </div>
+                                    <div>
+                                        <label for="day_range" class="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Day range</label>
+                                        <input
+                                            type="text"
+                                            name="day_range"
+                                            id="day_range"
+                                            pattern="^\s*\d+\s*-\s*\d+\s*$"
+                                            class="mt-2 w-full rounded-2xl border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                            placeholder="e.g. 18-22"
+                                        >
+                                    </div>
+                                </div>
+
+                                <label class="flex items-center gap-3 rounded-[1.35rem] border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-slate-700">
+                                    <input type="checkbox" name="apply_catch_up" value="1" class="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500">
+                                    Mark all missed reading days up to the chosen day
+                                </label>
+
+                                <button type="submit" class="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                    Update Reading Progress
+                                </button>
+                            </form>
+
+                            <p class="mt-4 text-xs leading-6 text-slate-500">
+                                Break days are skipped automatically and already completed days are ignored.
+                            </p>
+                        </div>
+                    </aside>
+                </section>
+
+                <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 lg:p-8">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Navigate</p>
+                            <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Move across recent, current, and upcoming schedule days.</h3>
+                        </div>
+                        @if($viewingDay !== $activeDay)
+                            <button wire:click="resetToToday" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-stone-50">
+                                Back to today
+                            </button>
+                        @endif
+                    </div>
+
+                    <div class="mt-6 overflow-x-auto">
+                        <div class="flex min-w-max gap-3 pb-2">
+                            @foreach($nearbyDays as $day)
+                                <button wire:click="viewDay({{ $day['day'] }})" class="w-28 flex-shrink-0 rounded-[1.5rem] border px-4 py-4 text-left transition {{ $day['is_current'] ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'border-stone-200 bg-stone-50 text-slate-700 hover:border-stone-300 hover:bg-white' }}">
+                                    <p class="text-[11px] uppercase tracking-[0.2em] {{ $day['is_current'] ? 'text-slate-300' : 'text-slate-500' }}">Day</p>
+                                    <p class="mt-2 text-2xl font-semibold">{{ $day['day'] }}</p>
+                                    <p class="mt-3 text-xs {{ $day['is_current'] ? 'text-slate-200' : 'text-slate-500' }}">
+                                        @if($day['is_break_day'])
+                                            Break day
+                                        @elseif($day['completed'])
+                                            Completed
+                                        @elseif($day['is_today'])
+                                            Scheduled today
+                                        @else
+                                            Pending
+                                        @endif
+                                    </p>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                    <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Calendar</p>
+                                <h3 class="mt-2 text-2xl font-semibold text-slate-900">{{ \Carbon\Carbon::create($calendarYear, $calendarMonth, 1)->format('F Y') }}</h3>
+                            </div>
+                            <div class="flex gap-2">
+                                <button wire:click="previousMonth" class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white">Prev</button>
+                                <button wire:click="nextMonth" class="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white">Next</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-7 gap-2 text-center">
+                            @foreach(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $label)
+                                <div class="pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $label }}</div>
+                            @endforeach
+
+                            @foreach($calendarDays as $day)
+                                <div class="flex h-12 items-center justify-center rounded-2xl text-sm font-medium
+                                    {{ !$day['is_current_month'] ? 'text-slate-300' : 'text-slate-700' }}
+                                    {{ $day['is_break_day'] && !$day['is_future'] ? 'bg-stone-200' : '' }}
+                                    {{ $day['is_completed'] ? 'bg-emerald-500 text-white' : '' }}
+                                    {{ $day['is_missed'] ? 'bg-rose-100 text-rose-700' : '' }}
+                                    {{ $day['is_today'] ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-white' : '' }}">
+                                    {{ $day['day'] }}
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-6 flex flex-wrap gap-4 text-xs text-slate-500">
+                            <div class="flex items-center gap-2">
+                                <span class="h-3.5 w-3.5 rounded-full bg-emerald-500"></span>
+                                Completed
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="h-3.5 w-3.5 rounded-full bg-rose-100"></span>
+                                Missed
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="h-3.5 w-3.5 rounded-full bg-stone-200"></span>
+                                Break day
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="h-3.5 w-3.5 rounded-full border-2 border-sky-500"></span>
+                                Today
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-6">
+                        <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Reading History</p>
+                                    <h3 class="mt-2 text-xl font-semibold text-slate-900">Recent days</h3>
+                                </div>
+                                <a href="{{ route('reading-history') }}" class="text-sm font-medium text-emerald-700 transition hover:text-emerald-800">View full history</a>
+                            </div>
+
+                            <div class="mt-5 space-y-3">
+                                @forelse($readingHistory as $history)
+                                    <div class="rounded-[1.35rem] border border-stone-200 bg-stone-50 px-4 py-4">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <p class="text-sm font-semibold text-slate-900">Day {{ $history['day'] }} · {{ $history['date'] }}</p>
+                                                <p class="mt-1 text-sm text-slate-600">{{ $history['reading'] }}</p>
+                                            </div>
+                                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $history['completed'] ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }}">
+                                                {{ $history['completed'] ? 'Completed' : 'Missed' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="rounded-[1.35rem] border border-dashed border-stone-200 px-4 py-8 text-center text-sm text-slate-500">
+                                        No reading history yet.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Group Updates</p>
+                                    <h3 class="mt-2 text-xl font-semibold text-slate-900">Community encouragement</h3>
+                                </div>
+                            </div>
+
+                            <div class="mt-5 space-y-3">
+                                @forelse($groupMessages as $message)
+                                    <div class="rounded-[1.35rem] border border-stone-200 bg-stone-50 px-4 py-4">
+                                        <p class="text-sm font-semibold text-slate-900">
+                                            {{ $message->is_admin_message ? 'Admin Message' : $message->title }}
+                                        </p>
+                                        <p class="mt-2 text-sm leading-6 text-slate-600">{{ $message->message }}</p>
+                                        <p class="mt-3 text-xs text-slate-400">{{ $message->created_at->diffForHumans() }}</p>
+                                    </div>
+                                @empty
+                                    <div class="rounded-[1.35rem] border border-dashed border-stone-200 px-4 py-8 text-center text-sm text-slate-500">
+                                        No group updates yet.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            @endif
+        </div>
+
+        @if($showCatchUpModal)
+            <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 px-4 py-10 backdrop-blur-sm" wire:click="closeCatchUpModal">
+                <div class="mx-auto w-full max-w-3xl rounded-[2rem] bg-white shadow-2xl shadow-slate-900/20" wire:click.stop>
+                    <div class="flex items-center justify-between border-b border-stone-200 px-6 py-5">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Catch Up</p>
+                            <h3 class="mt-2 text-2xl font-semibold text-slate-900">Missed readings waiting for completion</h3>
+                        </div>
+                        <button wire:click="closeCatchUpModal" class="rounded-2xl p-3 text-slate-400 transition hover:bg-stone-100 hover:text-slate-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="px-6 py-6">
+                        @if($missedReadings && count($missedReadings) > 0)
+                            <div class="max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+                                @foreach($missedReadings as $reading)
+                                    <div class="rounded-[1.5rem] border px-4 py-4 {{ $selectedReading && $selectedReading->id == $reading->id ? 'border-sky-300 bg-sky-50' : 'border-stone-200 bg-stone-50' }}">
+                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p class="text-sm font-semibold text-slate-900">Day {{ $reading->day_number }}</p>
+                                                <p class="mt-1 text-sm text-slate-600">{{ $reading->reading_range }}</p>
+                                                <p class="mt-2 text-xs text-slate-400">
+                                                    Assigned {{ ($readingPlan->reading_start_date ?? $readingPlan->start_date)?->copy()->addDays($reading->day_number - 1)->format('M d, Y') }}
+                                                </p>
+                                            </div>
+                                            <button wire:click="selectReading({{ $reading->id }})" class="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-medium transition {{ $selectedReading && $selectedReading->id == $reading->id ? 'bg-sky-600 text-white hover:bg-sky-700' : 'border border-stone-200 bg-white text-slate-700 hover:bg-stone-100' }}">
+                                                {{ $selectedReading && $selectedReading->id == $reading->id ? 'Selected' : 'Select' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button wire:click="closeCatchUpModal" class="inline-flex items-center justify-center rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-stone-50">
+                                    Cancel
+                                </button>
+                                <button wire:click="markPreviousAsComplete" {{ !$selectedReading ? 'disabled' : '' }} class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-stone-300">
+                                    Mark Selected Day Complete
+                                </button>
+                            </div>
+                        @else
+                            <div class="rounded-[1.5rem] border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-slate-500">
+                                You have no missed readings to catch up on.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if (session()->has('message'))
+            <div class="fixed right-4 top-4 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-lg shadow-emerald-900/10" role="alert">
+                {{ session('message') }}
+            </div>
+        @endif
+
+        @if (session()->has('success'))
+            <div class="fixed right-4 top-4 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-lg shadow-emerald-900/10" role="alert">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session()->has('error'))
+            <div class="fixed right-4 top-4 z-50 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-lg shadow-rose-900/10" role="alert">
+                {{ session('error') }}
+            </div>
+        @endif
+    @else
+        <div class="rounded-[2rem] border border-amber-200 bg-amber-50 px-6 py-8 text-amber-900 shadow-sm shadow-amber-900/5">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-start gap-3">
+                    <span class="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                        <i class="fas fa-circle-exclamation"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-lg font-semibold">Reading plan not found</h3>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-amber-800/85">
+                            It looks like you do not have an active reading plan or the current plan data needs to be refreshed.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="{{ route('reading-plans.index') }}" class="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-amber-700">
+                        Browse Reading Plans
+                    </a>
+                    <button wire:click="$refresh" class="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100">
+                        Refresh
+                    </button>
                 </div>
             </div>
         </div>
-
-        
-         
-          <!-- Reading Stats & Calendar Row -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <!-- Reading Stats -->
-              <div class="bg-white rounded-lg shadow p-6 col-span-1">
-                  <h3 class="font-bold text-lg mb-4 text-gray-700">Reading Stats</h3>
-                  <div class="space-y-4">
-                      <div class="flex justify-between items-center">
-                          <span class="text-gray-600">Current Streak</span>
-                          <span class="font-bold text-xl">{{ $userPlan->pivot->current_streak ?? 0 }} days</span>
-                      </div>
-                      <div class="flex justify-between items-center">
-                          <span class="text-gray-600">Completion Rate</span>
-                          <span class="font-bold text-xl">{{ number_format($userPlan->pivot->completion_rate ?? 0, 0) }}%</span>
-                      </div>
-                      <div class="flex justify-between items-center">
-                          <span class="text-gray-600">Next Break</span>
-                          <span class="font-bold text-xl">{{ $nextBreakDays ?? 0 }} days</span>
-                      </div>
-                  </div>
-              </div>
-
-              <!-- Progress Calendar -->
-              <div class="bg-white rounded-lg shadow p-6 col-span-1 md:col-span-2">
-                  <div class="flex items-center justify-between mb-4">
-                      <h3 class="font-bold text-lg text-gray-700">
-                          {{ \Carbon\Carbon::create($calendarYear, $calendarMonth, 1)->format('F Y') }}
-                      </h3>
-                      <div class="space-x-2">
-                          <button wire:click="previousMonth" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Prev</button>
-                          <button wire:click="nextMonth" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200">Next</button>
-                      </div>
-                  </div>
-                  <div class="grid grid-cols-7 gap-2 text-center">
-                      <div class="text-xs font-medium text-gray-500">Sun</div>
-                      <div class="text-xs font-medium text-gray-500">Mon</div>
-                      <div class="text-xs font-medium text-gray-500">Tue</div>
-                      <div class="text-xs font-medium text-gray-500">Wed</div>
-                      <div class="text-xs font-medium text-gray-500">Thu</div>
-                      <div class="text-xs font-medium text-gray-500">Fri</div>
-                      <div class="text-xs font-medium text-gray-500">Sat</div>
-                      
-                      <!-- Calendar days -->
-                      @if($calendarDays && count($calendarDays) > 0)
-                          @foreach($calendarDays as $day)
-                              <div wire:key="cal-{{ $day['date']->format('Y-m-d') }}" class="h-10 w-10 rounded-full flex items-center justify-center 
-                                  {{ !$day['is_current_month'] ? 'text-gray-400' : 'text-gray-600' }}
-                                  {{ $day['is_break_day'] && !$day['is_future'] ? 'bg-gray-200' : '' }}
-                                  {{ $day['is_completed'] ? 'bg-green-500 text-white' : '' }}
-                                  {{ $day['is_missed'] ? 'bg-red-200 text-red-800' : '' }}
-                                  {{ $day['is_today'] ? 'font-bold border-2 border-blue-600' : '' }}">
-                                  {{ $day['day'] }}
-                              </div>
-                          @endforeach
-                      @endif
-                  </div>
-                  <div class="mt-4 flex justify-end space-x-4">
-                      <div class="flex items-center">
-                          <div class="h-4 w-4 rounded-full bg-green-500 mr-2"></div>
-                          <span class="text-xs text-gray-600">Completed</span>
-                      </div>
-                      <div class="flex items-center">
-                          <div class="h-4 w-4 rounded-full bg-red-200 mr-2"></div>
-                          <span class="text-xs text-gray-600">Missed</span>
-                      </div>
-                      <div class="flex items-center">
-                          <div class="h-4 w-4 rounded-full bg-gray-200 mr-2"></div>
-                          <span class="text-xs text-gray-600">Break Day</span>
-                      </div>
-                      <div class="flex items-center">
-                          <div class="h-4 w-4 rounded-full border-2 border-blue-600 mr-2"></div>
-                          <span class="text-xs text-gray-600">Today</span>
-                      </div>
-                  </div>
-              </div>
-          </div>
-
-          <!-- Reading History & Community Section -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <!-- Reading History -->
-              <div class="bg-white rounded-lg shadow p-6">
-                  <h3 class="font-bold text-lg mb-4 text-gray-700">Reading History</h3>
-                  <div class="space-y-4">
-                      @forelse($readingHistory as $history)
-                          <div class="border-b pb-3">
-                              <div class="flex justify-between">
-                                  <div>
-                                      <span class="font-medium">Day {{ $history['day'] }} - {{ $history['date'] }}</span>
-                                      <p class="text-gray-600">{{ $history['reading'] }}</p>
-                                  </div>
-                                  @if($history['completed'])
-                                      <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
-                                          <i class="fas fa-check mr-1"></i> Completed
-                                      </span>
-                                  @else
-                                      <span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center">
-                                          <i class="fas fa-times mr-1"></i> Missed
-                                      </span>
-                                  @endif
-                              </div>
-                          </div>
-                      @empty
-                          <div class="text-center text-gray-600 py-4">
-                              No reading history yet.
-                          </div>
-                      @endforelse
-                  </div>
-                  <div class="mt-4 text-center">
-                      <a href="{{ route('reading-history') }}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View Full History</a>
-                  </div>
-              </div>
-
-              <!-- Community Updates -->
-              <div class="bg-white rounded-lg shadow p-6">
-                  <h3 class="font-bold text-lg mb-4 text-gray-700">Group Updates</h3>
-                  <div class="space-y-4">
-                      @forelse($groupMessages as $message)
-                          <div class="border-b pb-3">
-                              <p class="text-gray-800">
-                                  <span class="font-medium">{{ $message->is_admin_message ? 'Admin Message' : $message->title }}:</span> 
-                                  {{ $message->message }}
-                              </p>
-                              <p class="text-gray-500 text-sm mt-1">
-                                  {{ $message->created_at->diffForHumans() }}
-                              </p>
-                          </div>
-                      @empty
-                          <div class="text-center text-gray-600 py-4">
-                              No group updates yet.
-                          </div>
-                      @endforelse
-                  </div>
-                  <div class="mt-4 text-center">
-                      <a href="#" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View All Updates</a>
-                  </div>
-              </div>
-          </div>
-      </div>
-
-      <!-- Catch Up Modal -->
-      @if($showCatchUpModal)
-          <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="closeCatchUpModal">
-              <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white" wire:click.stop>
-                  <div class="mt-3">
-                      <div class="flex items-center justify-between mb-4">
-                          <h3 class="text-lg font-medium text-gray-900">Catch Up on Missed Readings</h3>
-                          <button wire:click="closeCatchUpModal" class="text-gray-400 hover:text-gray-600">
-                              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                              </svg>
-                          </button>
-                          
-                      </div>
-                      </div>
-                      
-                      @if($missedReadings && count($missedReadings) > 0)
-                          <div class="space-y-3 max-h-96 overflow-y-auto">
-                              @foreach($missedReadings as $reading)
-                                  <div class="border rounded-lg p-4 {{ $selectedReading && $selectedReading->id == $reading->id ? 'border-blue-500 bg-blue-50' : 'border-gray-200' }}">
-                                      <div class="flex items-center justify-between">
-                                                                                      <div class="flex-1">
-                                              <h4 class="font-medium text-gray-900">Day {{ $reading->day_number }}</h4>
-                                              <p class="text-sm text-gray-600">{{ $reading->reading_range }}</p>
-                                              <p class="text-xs text-gray-500 mt-1">
-                                                  Assigned: {{ Carbon\Carbon::parse($readingPlan->start_date)->addDays($reading->day_number - 1)->format('M d, Y') }}
-                                              </p>
-                                          </div>
-                                          <div class="flex space-x-2">
-                                              <button 
-                                                  wire:click="selectReading({{ $reading->id }})"
-                                                  class="px-3 py-1 text-sm rounded {{ $selectedReading && $selectedReading->id == $reading->id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}">
-                                                  {{ $selectedReading && $selectedReading->id == $reading->id ? 'Selected' : 'Select' }}
-                                              </button>
-                                          </div>
-                                      </div>
-                                  </div>
-                              @endforeach
-                          </div>
-                          
-                          <div class="mt-6 flex justify-end space-x-3">
-                              <button 
-                                  wire:click="closeCatchUpModal"
-                                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                                  Cancel
-                              </button>
-                              <button 
-                                  wire:click="markPreviousAsComplete"
-                                  {{ !$selectedReading ? 'disabled' : '' }}
-                                  class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                                  Mark Selected as Complete
-                              </button>
-                          </div>
-                      @else
-                          <div class="text-center py-8">
-                              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                              </svg>
-                              <h3 class="mt-2 text-sm font-medium text-gray-900">All caught up!</h3>
-                              <p class="mt-1 text-sm text-gray-500">You have no missed readings to catch up on.</p>
-                          </div>
-                      @endif
-                  </div>
-              </div>
-          </div>
-      @endif
-
-      <!-- Flash Messages -->
-      @if (session()->has('message'))
-          <div class="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50" role="alert">
-              <span class="block sm:inline">{{ session('message') }}</span>
-          </div>
-      @endif
-
-      @if (session()->has('error'))
-          <div class="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50" role="alert">
-              <span class="block sm:inline">{{ session('error') }}</span>
-          </div>
-      @endif
-
-  @else
-      <!-- Fallback when userPlan or pivot is null -->
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-              <div class="flex">
-                  <div class="flex-shrink-0">
-                      <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                      </svg>
-                  </div>
-                  <div class="ml-3">
-                      <h3 class="text-sm font-medium text-yellow-800">
-                          Reading Plan Not Found
-                      </h3>
-                      <div class="mt-2 text-sm text-yellow-700">
-                          <p>It looks like you don't have an active reading plan or there's an issue with your plan data.</p>
-                      </div>
-                      <div class="mt-4">
-                          <div class="-mx-2 -my-1.5 flex">
-                              <a href="{{ route('reading-plans.index') }}" class="bg-yellow-50 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-100">
-                                  Browse Reading Plans
-                              </a>
-                              <button wire:click="$refresh" class="ml-3 bg-yellow-50 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-100">
-                                  Refresh Page
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      </div>
-  @endif
+    @endif
 </div>
-

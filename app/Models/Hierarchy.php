@@ -1,12 +1,28 @@
 <?php
+
 namespace App\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class Hierarchy extends Model
 {
     protected $fillable = ['name', 'type', 'leader_id', 'parent_id'];
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderByRaw("
+            case type
+                when 'clan' then 1
+                when 'platoon' then 2
+                when 'squad' then 3
+                when 'batch' then 4
+                when 'team' then 5
+                else 6
+            end
+        ")->orderBy('name');
+    }
 
     public function leader()
     {
@@ -22,7 +38,6 @@ class Hierarchy extends Model
     {
         return $this->belongsTo(Hierarchy::class, 'parent_id');
     }
-  
 
     public function children()
     {
@@ -43,23 +58,61 @@ class Hierarchy extends Model
     {
         return $this->children()->where('type', 'team');
     }
-   
+
     public function descendants()
     {
         return $this->children()->with('descendants');
     }
+
     public function getAllMembers()
     {
-        return User::whereIn('hierarchy_id', 
-            $this->descendants()->pluck('id')->push($this->id)
-        );
+        return User::whereIn('hierarchy_id', $this->descendantIdsIncludingSelf());
     }
 
     public function getActiveMembersToday()
     {
         return $this->getAllMembers()
-            ->whereHas('readingProgress', function($query) {
-                $query->where('completed_at', '>=', now()->startOfDay());
+            ->whereHas('readingProgress', function ($query) {
+                $query->whereDate('completed_date', Carbon::today());
             });
+    }
+
+    public function descendantIdsIncludingSelf(): Collection
+    {
+        $children = $this->relationLoaded('children')
+            ? $this->children
+            : $this->children()->with('children')->get();
+
+        $ids = collect([$this->id]);
+
+        foreach ($children as $child) {
+            $ids = $ids->merge($child->descendantIdsIncludingSelf());
+        }
+
+        return $ids->unique()->values();
+    }
+
+    public function descendantTeamsIncludingSelf(): Collection
+    {
+        return static::with(['parent', 'leader'])
+            ->whereIn('id', $this->descendantIdsIncludingSelf())
+            ->where('type', 'team')
+            ->ordered()
+            ->get();
+    }
+
+    public function displayPath(): string
+    {
+        $segments = collect();
+        $current = $this;
+
+        while ($current) {
+            $segments->prepend($current->name);
+            $current = $current->relationLoaded('parent')
+                ? $current->parent
+                : $current->parent()->first();
+        }
+
+        return $segments->implode(' / ');
     }
 }

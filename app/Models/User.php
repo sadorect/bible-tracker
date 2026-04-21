@@ -2,19 +2,29 @@
 
 namespace App\Models;
 
-use App\Models\Hierarchy;
-use App\Models\ReadingPlan;
-use App\Models\BibleChapter;
-use App\Models\GroupMessage;
-use App\Models\ReadingProgress;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use Notifiable;
+    use HasFactory, Notifiable;
+
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_MEMBER = 'member';
+
+    public const ROLE_CLAN_LEADER = 'clan_leader';
+
+    public const ROLE_PLATOON_LEADER = 'platoon_leader';
+
+    public const ROLE_SQUAD_LEADER = 'squad_leader';
+
+    public const ROLE_BATCH_LEADER = 'batch_leader';
+
+    public const ROLE_TEAM_LEADER = 'team_leader';
 
     /**
      * The attributes that are mass assignable.
@@ -22,8 +32,54 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name', 'email', 'phone_number', 'password', 'role', 'hierarchy_id'
+        'name', 'email', 'phone_number', 'password', 'role', 'hierarchy_id',
     ];
+
+    public static function roleOptions(): array
+    {
+        return [
+            self::ROLE_MEMBER => 'Member',
+            self::ROLE_TEAM_LEADER => 'Team Leader',
+            self::ROLE_BATCH_LEADER => 'Batch Leader',
+            self::ROLE_PLATOON_LEADER => 'Platoon Leader',
+            self::ROLE_SQUAD_LEADER => 'Squad Leader',
+            self::ROLE_ADMIN => 'Admin',
+            self::ROLE_CLAN_LEADER => 'Clan Leader',
+        ];
+    }
+
+    public static function assignableRoles(): array
+    {
+        return array_keys(self::roleOptions());
+    }
+
+    public static function leaderRoles(): array
+    {
+        return [
+            self::ROLE_CLAN_LEADER,
+            self::ROLE_PLATOON_LEADER,
+            self::ROLE_SQUAD_LEADER,
+            self::ROLE_BATCH_LEADER,
+            self::ROLE_TEAM_LEADER,
+        ];
+    }
+
+    public static function hierarchyTypeForRole(string $role): ?string
+    {
+        return match ($role) {
+            self::ROLE_MEMBER, self::ROLE_TEAM_LEADER => 'team',
+            self::ROLE_BATCH_LEADER => 'batch',
+            self::ROLE_PLATOON_LEADER => 'platoon',
+            self::ROLE_SQUAD_LEADER => 'squad',
+            self::ROLE_CLAN_LEADER => 'clan',
+            default => null,
+        };
+    }
+
+    public function roleLabel(): string
+    {
+        return self::roleOptions()[$this->role] ?? ucwords(str_replace('_', ' ', $this->role));
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -78,14 +134,77 @@ class User extends Authenticatable
         return $this->hasMany(ReadingProgress::class);
     }
 
+    public function trainingCompletions(): HasMany
+    {
+        return $this->hasMany(TrainingCompletion::class);
+    }
+
     public function readingPlans(): BelongsToMany
     {
         return $this->belongsToMany(ReadingPlan::class, 'user_reading_plans')
-                    ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
-                    ->withTimestamps();
+            ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
+            ->withTimestamps();
     }
 
-    
+    public function activeReadingPlan(): ?ReadingPlan
+    {
+        return $this->readingPlans()
+            ->wherePivot('is_active', true)
+            ->first();
+    }
+
+    public function activeReadingPlanFromLoaded(): ?ReadingPlan
+    {
+        if (! $this->relationLoaded('readingPlans')) {
+            return $this->activeReadingPlan();
+        }
+
+        return $this->readingPlans->first(fn (ReadingPlan $plan) => (bool) $plan->pivot?->is_active);
+    }
+
+    public function hasCompletedPlan(ReadingPlan $readingPlan): bool
+    {
+        $requiredReadings = $readingPlan->dailyReadings()
+            ->where('is_break_day', false)
+            ->count();
+
+        if ($requiredReadings === 0) {
+            return false;
+        }
+
+        $completedReadings = $this->readingProgress()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->distinct('daily_reading_id')
+            ->count('daily_reading_id');
+
+        return $completedReadings >= $requiredReadings;
+    }
+
+    public function hasCompletedPlanType(string $type): bool
+    {
+        return $this->readingPlans()
+            ->where('type', $type)
+            ->get()
+            ->contains(fn (ReadingPlan $readingPlan) => $this->hasCompletedPlan($readingPlan));
+    }
+
+    public function currentLeadershipHierarchy(): ?Hierarchy
+    {
+        $expectedType = self::hierarchyTypeForRole($this->role);
+
+        if ($expectedType) {
+            $assignedHierarchy = $this->relationLoaded('hierarchy')
+                ? $this->hierarchy
+                : $this->hierarchy()->first();
+
+            if ($assignedHierarchy && $assignedHierarchy->type === $expectedType) {
+                return $assignedHierarchy;
+            }
+        }
+
+        return Hierarchy::where('leader_id', $this->id)->first();
+    }
+
     /**
      * Check if the user is an admin.
      *
@@ -93,28 +212,22 @@ class User extends Authenticatable
      */
     public function isAdmin()
     {
-        return $this->role === 'admin';
+        return $this->role === self::ROLE_ADMIN;
     }
 
     public function isLeader()
     {
-        return in_array($this->role, ['clan_leader', 'platoon_leader', 'squad_leader', 'batch_leader', 'team_leader']);
+        return in_array($this->role, self::leaderRoles(), true);
     }
 
     public function groupMessages(): HasMany
     {
         return $this->hasMany(GroupMessage::class);
     }
-    
+
     public function canManageHierarchy()
     {
-        return in_array($this->role, [
-            'clan_leader',
-            'platoon_leader',
-            'squad_leader',
-            'batch_leader',
-            'team_leader'
-        ]) || $this->isAdmin();
+        return $this->isLeader() || $this->isAdmin();
     }
 
     /**

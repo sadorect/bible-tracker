@@ -7,227 +7,167 @@
 
     <title>{{ config('app.name', 'Bible Reading Tracker') }}</title>
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
-    
-    <!-- Font Awesome -->
+    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-    <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    
-    <!-- Livewire Styles -->
     @livewireStyles
-
-    <!-- Alpine is loaded via Vite (resources/js/app.js). Removed CDN include to avoid multiple Alpine instances. -->
 </head>
-<body class="font-inter antialiased bg-gray-50" x-data="{ sidebarOpen: false }">
+@php($user = auth()->user())
+<body class="bg-stone-100 font-['Instrument_Sans'] text-slate-900 antialiased" x-data="{ sidebarOpen: false }">
     <div class="min-h-screen">
-        <!-- Mobile sidebar overlay -->
-        <div 
-            x-show="sidebarOpen" 
-            x-transition:enter="transition-opacity ease-linear duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition-opacity ease-linear duration-300"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
+        <div
+            x-show="sidebarOpen"
+            x-transition.opacity
             @click="sidebarOpen = false"
-            class="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden"
+            class="fixed inset-0 z-40 bg-slate-900/60 lg:hidden"
         ></div>
 
-        <!-- Top Navigation Bar -->
-        <nav class="bg-white shadow-sm border-b border-gray-200 fixed w-full top-0 z-30">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <!-- Left side -->
-                    <div class="flex items-center">
-                        <!-- Mobile menu button -->
-                        <button 
-                            @click="sidebarOpen = !sidebarOpen"
-                            class="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-                        >
-                            <i class="fas fa-bars text-lg"></i>
-                        </button>
-                        
-                        <!-- Logo -->
-                        <div class="flex items-center ml-2 md:ml-0">
-                            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                                <i class="fas fa-book-bible text-white text-sm"></i>
-                            </div>
-                            <a href="{{ route('dashboard') }}" class="text-xl font-bold text-gray-900 hidden sm:block">
-                                Bible Tracker
-                            </a>
+        <aside
+            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+            class="fixed inset-y-0 left-0 z-50 w-72 transform border-r border-stone-200 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur transition duration-300 ease-out"
+        >
+            <div class="flex h-20 items-center justify-between border-b border-stone-200 px-6">
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
+                        <i class="fas fa-book-bible text-sm"></i>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-semibold uppercase tracking-[0.24em] text-emerald-600">Bible Journey</span>
+                        <span class="block text-lg font-semibold text-slate-900">Member Space</span>
+                    </span>
+                </a>
+
+                <button @click="sidebarOpen = false" class="rounded-xl p-2 text-slate-400 hover:bg-stone-100 hover:text-slate-600 lg:hidden">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="flex h-[calc(100vh-5rem)] flex-col justify-between px-4 py-6">
+                <div class="space-y-8">
+                    <div class="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-700 px-5 py-6 text-white shadow-xl shadow-slate-900/15">
+                        <p class="text-xs uppercase tracking-[0.3em] text-emerald-200">Walking Together</p>
+                        <p class="mt-3 text-xl font-semibold leading-tight">{{ $user->name }}</p>
+                        <div class="mt-4 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium capitalize text-emerald-50">
+                            {{ str_replace('_', ' ', $user->role) }}
                         </div>
                     </div>
 
-                    <!-- Right side -->
-                    <div class="flex items-center space-x-4">
-                        <!-- Notifications -->
-                        <div class="relative">
-                            <button class="p-2 text-gray-400 hover:text-gray-500">
-                                <i class="fas fa-bell text-lg"></i>
-                                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                    3
-                                </span>
-                            </button>
-                        </div>
+                    <nav class="space-y-1.5">
+                        <a href="{{ route('dashboard') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('dashboard') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
+                            <i class="fas fa-house w-5 text-center"></i>
+                            Dashboard
+                        </a>
+                        <a href="{{ route('reading-plans.index') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('reading-plans.*') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
+                            <i class="fas fa-book-open w-5 text-center"></i>
+                            Reading Plans
+                        </a>
+                        <a href="{{ route('reading.progress') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('reading.progress') || request()->routeIs('progress.view') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
+                            <i class="fas fa-chart-line w-5 text-center"></i>
+                            Progress
+                        </a>
+                        <a href="{{ route('reading-history') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('reading-history') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
+                            <i class="fas fa-clock-rotate-left w-5 text-center"></i>
+                            Reading History
+                        </a>
+                        @if($user->canManageHierarchy())
+                            <a href="{{ route('hierarchy.manage') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('hierarchy.manage') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
+                                <i class="fas fa-people-group w-5 text-center"></i>
+                                Manage Team
+                            </a>
+                        @endif
+                        @if($user->isAdmin())
+                            <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition text-slate-600 hover:bg-stone-100 hover:text-slate-900">
+                                <i class="fas fa-shield-halved w-5 text-center"></i>
+                                Admin Console
+                            </a>
+                        @endif
+                    </nav>
+                </div>
 
-                        <!-- User menu -->
+                <div class="rounded-3xl border border-stone-200 bg-stone-50 px-5 py-4 text-sm text-slate-600">
+                    <p class="font-semibold text-slate-900">Daily rhythm</p>
+                    <p class="mt-2 leading-relaxed">Train, read faithfully for ten days, pause for a refresh-and-prayer break, then continue the journey.</p>
+                </div>
+            </div>
+        </aside>
+
+        <div class="lg:pl-72">
+            <header class="sticky top-0 z-30 border-b border-stone-200 bg-stone-100/90 backdrop-blur">
+                <div class="mx-auto flex h-20 w-full max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8 xl:px-10">
+                    <div class="flex items-center gap-3">
+                        <button @click="sidebarOpen = true" class="rounded-2xl border border-stone-200 bg-white p-3 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 lg:hidden">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">Scripture Tracker</p>
+                            <h1 class="text-lg font-semibold text-slate-900">Stay steady, stay encouraged.</h1>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('profile.edit') }}" class="hidden rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-stone-300 hover:text-slate-900 sm:inline-flex">
+                            Profile
+                        </a>
+
                         <div class="relative" x-data="{ open: false }">
-                            <button 
-                                @click="open = !open"
-                                class="flex items-center space-x-3 p-1 rounded-full hover:bg-gray-100"
-                            >
-                                <img 
-                                    class="w-8 h-8 rounded-full" 
-                                    src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name) }}&background=3B82F6&color=fff" 
-                                    alt="User avatar"
-                                >
-                                <div class="hidden sm:block text-left">
-                                    <div class="text-sm font-medium text-gray-900">{{ auth()->user()->name }}</div>
-                                    <div class="text-xs text-gray-500 capitalize">{{ auth()->user()->role }}</div>
+                            <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-stone-300">
+                                <img class="h-10 w-10 rounded-2xl object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=0f172a&color=fff" alt="User avatar">
+                                <div class="hidden text-left sm:block">
+                                    <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
+                                    <p class="text-xs capitalize text-slate-500">{{ str_replace('_', ' ', $user->role) }}</p>
                                 </div>
-                                <i class="fas fa-chevron-down text-gray-400 text-xs hidden sm:block"></i>
+                                <i class="fas fa-chevron-down text-xs text-slate-400"></i>
                             </button>
-                            
-                            <!-- Dropdown menu -->
-                            <div 
-                                x-show="open" 
+
+                            <div
+                                x-show="open"
                                 @click.away="open = false"
-                                x-transition:enter="transition ease-out duration-100"
-                                x-transition:enter-start="transform opacity-0 scale-95"
-                                x-transition:enter-end="transform opacity-100 scale-100"
-                                x-transition:leave="transition ease-in duration-75"
-                                x-transition:leave-start="transform opacity-100 scale-100"
-                                x-transition:leave-end="transform opacity-0 scale-95"
-                                class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-gray-200"
+                                x-transition
+                                class="absolute right-0 mt-3 w-56 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-2xl shadow-slate-900/10"
                             >
-                                <a href="{{ route('profile.edit') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    <i class="fas fa-user-edit mr-3 text-gray-400"></i>
-                                    Profile Settings
+                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-stone-50 hover:text-slate-900">
+                                    <i class="fas fa-user-gear w-4 text-center text-slate-400"></i>
+                                    Profile settings
                                 </a>
-                                @if(auth()->user()->isAdmin())
-                                <a href="{{ route('admin.dashboard') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    <i class="fas fa-cog mr-3 text-gray-400"></i>
-                                    Admin Panel
-                                </a>
+                                @if($user->isAdmin())
+                                    <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-stone-50 hover:text-slate-900">
+                                        <i class="fas fa-shield-halved w-4 text-center text-slate-400"></i>
+                                        Admin dashboard
+                                    </a>
                                 @endif
-                                <hr class="my-2">
-                                <form method="POST" action="{{ route('logout') }}">
+                                <form method="POST" action="{{ route('logout') }}" class="border-t border-stone-200">
                                     @csrf
-                                    <button type="submit" class="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                                        <i class="fas fa-sign-out-alt mr-3"></i>
-                                        Sign Out
+                                    <button type="submit" class="flex w-full items-center gap-3 px-4 py-3 text-sm text-rose-600 transition hover:bg-rose-50">
+                                        <i class="fas fa-right-from-bracket w-4 text-center"></i>
+                                        Sign out
                                     </button>
                                 </form>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </nav>
+            </header>
 
-        <!-- Mobile Sidebar -->
-        <div 
-            x-show="sidebarOpen"
-            x-transition:enter="transition ease-in-out duration-300"
-            x-transition:enter-start="-translate-x-full"
-            x-transition:enter-end="translate-x-0"
-            x-transition:leave="transition ease-in-out duration-300"
-            x-transition:leave-start="translate-x-0"
-            x-transition:leave-end="-translate-x-full"
-            class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg md:hidden"
-        >
-            <div class="p-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                            <i class="fas fa-book-bible text-white text-sm"></i>
-                        </div>
-                        <span class="text-lg font-bold text-gray-900">Bible Tracker</span>
-                    </div>
-                    <button @click="sidebarOpen = false" class="p-2 text-gray-400 hover:text-gray-500">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <nav class="mt-8">
-                <div class="px-4 space-y-2">
-                    <a href="{{ route('dashboard') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700' : '' }}">
-                        <i class="fas fa-home mr-3"></i>
-                        Dashboard
-                    </a>
-                    <a href="{{ route('reading-plans.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('reading-plans.*') ? 'bg-blue-50 text-blue-700' : '' }}">
-                        <i class="fas fa-book-open mr-3"></i>
-                        Reading Plans
-                    </a>
-                    <a href="{{ route('reading-history') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('reading-history') ? 'bg-blue-50 text-blue-700' : '' }}">
-                        <i class="fas fa-history mr-3"></i>
-                        Reading History
-                    </a>
-                    <a href="{{ route('reading.progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ (request()->routeIs('reading.progress') || request()->routeIs('progress.view')) ? 'bg-blue-50 text-blue-700' : '' }}">
-                        <i class="fas fa-chart-line mr-3"></i>
-                        Progress
-                    </a>
-                </div>
-            </nav>
-        </div>
-
-        <!-- Desktop Sidebar -->
-        <div class="hidden md:fixed md:inset-y-0 md:left-0 md:z-20 md:w-64 md:bg-white md:shadow-sm md:border-r md:border-gray-200">
-            <div class="pt-20 pb-4">
-                <nav class="px-4 space-y-2">
-                    <a href="{{ route('dashboard') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
-                        <i class="fas fa-home mr-3"></i>
-                        Dashboard
-                    </a>
-                    <a href="{{ route('reading-plans.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('reading-plans.*') ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
-                        <i class="fas fa-book-open mr-3"></i>
-                        Reading Plans
-                    </a>
-                    <a href="{{ route('reading-history') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('reading-history') ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
-                        <i class="fas fa-history mr-3"></i>
-                        Reading History
-                    </a>
-                    <a href="{{ route('reading.progress') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ (request()->routeIs('reading.progress') || request()->routeIs('progress.view')) ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' : '' }}">
-                        <i class="fas fa-chart-line mr-3"></i>
-                        Progress
-                    </a>
-                </nav>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="md:pl-64 pt-16">
-            <main class="p-4 md:p-8">
-                <!-- Flash Messages -->
+            <main class="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
                 @if(session('success'))
-                <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div class="flex">
-                        <i class="fas fa-check-circle text-green-400 mr-3 mt-0.5"></i>
-                        <p class="text-green-800">{{ session('success') }}</p>
+                    <div class="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-sm shadow-emerald-900/5">
+                        {{ session('success') }}
                     </div>
-                </div>
                 @endif
 
                 @if(session('error'))
-                <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div class="flex">
-                        <i class="fas fa-exclamation-circle text-red-400 mr-3 mt-0.5"></i>
-                        <p class="text-red-800">{{ session('error') }}</p>
+                    <div class="mb-6 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
+                        {{ session('error') }}
                     </div>
-                </div>
                 @endif
 
                 @yield('content')
             </main>
         </div>
     </div>
-    
-    <!-- Livewire Scripts -->
+
     @livewireScripts
 </body>
 </html>

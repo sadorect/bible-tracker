@@ -1,116 +1,150 @@
 <x-admin-layout>
-    <div class="py-12">
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-semibold text-gray-900">Create New User</h1>
-                <a href="{{ route('admin.users.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                    Back to Users
-                </a>
-            </div>
+    <x-slot name="header">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Create a new user account.</h1>
+        </div>
+    </x-slot>
 
-            <!-- Form -->
-            <div class="bg-white rounded-lg shadow-md">
-                <form method="POST" action="{{ route('admin.users.store') }}" class="p-6 space-y-6">
-                    @csrf
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+            <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-8">
+                @csrf
 
-                    <!-- Basic Information -->
-                    <div>
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                                <input type="text" name="name" id="name" value="{{ old('name') }}" required
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                @error('name')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Account setup</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Basic information</h2>
+                </div>
+
+                <div class="grid gap-5 md:grid-cols-2">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Name</span>
+                        <input type="text" name="name" id="name" value="{{ old('name') }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('name')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Email</span>
+                        <input type="email" name="email" id="email" value="{{ old('email') }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('email')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Phone number</span>
+                        <input type="text" name="phone_number" id="phone_number" value="{{ old('phone_number') }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        <p class="mt-2 text-xs text-slate-500">Optional. Leave blank if this user signs in with email only.</p>
+                        @error('phone_number')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Role</span>
+                        <select name="role" id="role" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select role</option>
+                            @foreach($roleOptions as $value => $label)
+                                <option value="{{ $value }}" {{ old('role') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('role')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block md:col-span-2">
+                        <span class="text-sm font-medium text-slate-700">Hierarchy assignment</span>
+                        <select name="hierarchy_id" id="hierarchy_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Leave unassigned for now</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}" {{ (string) old('hierarchy_id') === (string) $hierarchy->id ? 'selected' : '' }}>
+                                    {{ ucfirst($hierarchy->type) }} · {{ $hierarchy->displayPath() }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-2 text-xs text-slate-500">Members should be assigned to a team. Leaders should be attached to the exact level they oversee.</p>
+                        @error('hierarchy_id')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Password</span>
+                        <input type="password" name="password" id="password" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('password')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Confirm password</span>
+                        <input type="password" name="password_confirmation" id="password_confirmation" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                    </label>
+                </div>
+
+                <div class="border-t border-slate-200 pt-8">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Enrollment</p>
+                            <h2 class="mt-2 text-2xl font-semibold text-slate-900">Assign reading plans</h2>
+                            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Attach one or more plans now if you want the account to start with a cohort immediately.</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid gap-4 md:grid-cols-2">
+                        @forelse($readingPlans as $plan)
+                            <label class="flex cursor-pointer items-start gap-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 transition hover:border-emerald-200 hover:bg-emerald-50/50">
+                                <input type="checkbox" name="reading_plans[]" value="{{ $plan->id }}" {{ in_array($plan->id, old('reading_plans', [])) ? 'checked' : '' }} class="mt-1 rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">{{ $plan->name }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ $plan->description ?: 'No plan description yet.' }}</p>
+                                    <div class="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                                        <span class="rounded-full bg-white px-3 py-1">{{ $plan->type_label }}</span>
+                                        <span class="rounded-full bg-white px-3 py-1">{{ $plan->cadence_description }}</span>
+                                    </div>
+                                </div>
+                            </label>
+                        @empty
+                            <div class="md:col-span-2 rounded-[1.5rem] border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
+                                No reading plans are available yet.
                             </div>
+                        @endforelse
+                    </div>
 
-                            <div>
-                                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                <input type="email" name="email" id="email" value="{{ old('email') }}" required
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                @error('email')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
+                    @error('reading_plans')
+                        <p class="mt-3 text-sm text-rose-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
-                            <div>
-                                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                <input type="password" name="password" id="password" required
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                       @error('password')
-                                       <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                   @enderror
-                               </div>
-   
-                               <div>
-                                   <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                                   <input type="password" name="password_confirmation" id="password_confirmation" required
-                                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                               </div>
-   
-                               <div>
-                                   <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                                   <select name="role" id="role" required
-                                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                       <option value="">Select Role</option>
-                                       <option value="member" {{ old('role') === 'member' ? 'selected' : '' }}>Member</option>
-                                       <option value="leader" {{ old('role') === 'leader' ? 'selected' : '' }}>Leader</option>
-                                       <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
-                                   </select>
-                                   @error('role')
-                                       <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                   @enderror
-                               </div>
-                           </div>
-                       </div>
-   
-                       <!-- Reading Plans -->
-                       <div>
-                           <h2 class="text-lg font-medium text-gray-900 mb-4">Reading Plans</h2>
-                           <p class="text-sm text-gray-600 mb-4">Select reading plans to assign to this user (optional).</p>
-                           
-                           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               @foreach($readingPlans as $plan)
-                                   <div class="border rounded-lg p-4">
-                                       <label class="flex items-start space-x-3 cursor-pointer">
-                                           <input type="checkbox" name="reading_plans[]" value="{{ $plan->id }}"
-                                                  {{ in_array($plan->id, old('reading_plans', [])) ? 'checked' : '' }}
-                                                  class="mt-1 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                           <div class="flex-1">
-                                               <div class="text-sm font-medium text-gray-900">{{ $plan->name }}</div>
-                                               <div class="text-sm text-gray-600">{{ $plan->description }}</div>
-                                               <div class="text-xs text-gray-500 mt-1">{{ $plan->duration_days }} days</div>
-                                           </div>
-                                       </label>
-                                   </div>
-                               @endforeach
-                           </div>
-                           
-                           @if($readingPlans->isEmpty())
-                               <p class="text-gray-500 text-center py-8">No reading plans available.</p>
-                           @endif
-                           
-                           @error('reading_plans')
-                               <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                           @enderror
-                       </div>
-   
-                       <!-- Submit Button -->
-                       <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                           <a href="{{ route('admin.users.index') }}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">
-                               Cancel
-                           </a>
-                           <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                               Create User
-                           </button>
-                       </div>
-                   </form>
-               </div>
-           </div>
-       </div>
-   </x-admin-layout>
-   
+                <div class="flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
+                    <a href="{{ route('admin.users.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                        Cancel
+                    </a>
+                    <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        Create user
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <aside class="space-y-6">
+            <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">What happens next</p>
+                <div class="mt-4 space-y-4 text-sm leading-6 text-slate-600">
+                    <p>Admin-created users are verified immediately so they can sign in without waiting on email verification.</p>
+                    <p>Assigning a plan here starts the user in that cohort with day one as their initial position.</p>
+                    <p>If training resources exist on the plan, the user must complete training before daily reading opens.</p>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-700 p-6 text-white shadow-2xl shadow-slate-900/15">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Admin note</p>
+                <h2 class="mt-3 text-2xl font-semibold">Keep cohort setup simple.</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Create the account first, assign the cohort if needed, and refine hierarchy placement afterward as the leadership structure takes shape.</p>
+            </section>
+        </aside>
+    </div>
+</x-admin-layout>

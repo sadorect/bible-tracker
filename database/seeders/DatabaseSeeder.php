@@ -3,11 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Database\Seeders\UserSeeder;
-use Database\Seeders\AdminUserSeeder;
-use Database\Seeders\HierarchySeeder;
-use Database\Seeders\BibleChapterSeeder;
-use Database\Seeders\BibleReadingSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,10 +12,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            //UserSeeder::class,         // First create users
-            //HierarchySeeder::class,    // Then create hierarchies
-            BibleChapterSeeder::class, // Finally seed bible chapters
-            //AdminUserSeeder::class,
+            BibleChapterSeeder::class,
+            AdminUserSeeder::class,
+            UserSeeder::class,
+            HierarchySeeder::class,
+            DemoDataSeeder::class,
         ]);
     }
 }

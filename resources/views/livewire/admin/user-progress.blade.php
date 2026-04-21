@@ -70,20 +70,58 @@
           @endif
           
           <!-- User List Table -->
-          <div class="overflow-x-auto">
+          <div
+              class="overflow-x-auto"
+              data-table-columns="livewire-admin-user-progress"
+              data-default-columns='{"current-day":false,"streak":false,"completion-rate":false}'
+              data-default-columns-md='{"current-day":true,"completion-rate":true}'
+              data-default-columns-xl='{"streak":true}'
+          >
+              <div class="mb-4 flex justify-end">
+                  <details class="relative">
+                      <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-gray-300 hover:text-gray-900">
+                          <i class="fas fa-table-columns text-gray-400"></i>
+                          Display columns
+                          <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+                      </summary>
+                      <div class="absolute right-0 z-10 mt-3 w-72 rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl">
+                          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">User list</p>
+                          <p class="mt-2 text-sm text-gray-500">Choose which progress columns stay visible while you manage reminders.</p>
+                          <div class="mt-4 grid gap-3">
+                              <label class="flex items-center gap-3 text-sm text-gray-700">
+                                  <input type="checkbox" data-column-toggle="current-day" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                  Current day
+                              </label>
+                              <label class="flex items-center gap-3 text-sm text-gray-700">
+                                  <input type="checkbox" data-column-toggle="streak" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                  Streak
+                              </label>
+                              <label class="flex items-center gap-3 text-sm text-gray-700">
+                                  <input type="checkbox" data-column-toggle="completion-rate" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                  Completion rate
+                              </label>
+                          </div>
+                          <button type="button" data-table-columns-reset class="mt-4 inline-flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-white hover:text-gray-900">
+                              Reset compact defaults
+                          </button>
+                      </div>
+                  </details>
+              </div>
+
+              <div data-table-columns-root>
               <table class="min-w-full divide-y divide-gray-200">
                   <thead class="bg-gray-50">
                       <tr>
                           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               User
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-column="current-day">
                               Current Day
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-column="streak">
                               Streak
                           </th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-column="completion-rate">
                               Completion Rate
                           </th>
                           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -102,16 +140,24 @@
                                       <div class="ml-4">
                                           <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
                                           <div class="text-sm text-gray-500">{{ $user->email }}</div>
+                                          <div class="mt-2 flex flex-wrap gap-2 text-xs md:hidden">
+                                              <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
+                                                  Day {{ $user->readingPlans->first()->pivot->current_day }}
+                                              </span>
+                                              <span class="inline-flex rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700">
+                                                  {{ number_format($user->readingPlans->first()->pivot->completion_rate, 0) }}%
+                                              </span>
+                                          </div>
                                       </div>
                                   </div>
                               </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
+                              <td class="px-6 py-4 whitespace-nowrap" data-column="current-day">
                                   <div class="text-sm text-gray-900">Day {{ $user->readingPlans->first()->pivot->current_day }}</div>
                               </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
+                              <td class="px-6 py-4 whitespace-nowrap" data-column="streak">
                                   <div class="text-sm text-gray-900">{{ $user->readingPlans->first()->pivot->current_streak }} days</div>
                               </td>
-                              <td class="px-6 py-4 whitespace-nowrap">
+                              <td class="px-6 py-4 whitespace-nowrap" data-column="completion-rate">
                                   <div class="flex items-center">
                                       <div class="w-16 bg-gray-200 rounded-full h-2.5">
                                           <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ $user->readingPlans->first()->pivot->completion_rate }}%"></div>
@@ -140,6 +186,7 @@
                       @endforelse
                   </tbody>
               </table>
+              </div>
           </div>
           
           <!-- Pagination -->

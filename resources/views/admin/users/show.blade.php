@@ -1,185 +1,158 @@
 <x-admin-layout>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">{{ $user->name }}</h1>
-                    <p class="text-gray-600">{{ $user->email }}</p>
-                </div>
-                <div class="flex space-x-3">
-                    <a href="{{ route('admin.users.edit', $user) }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                        Edit User
-                    </a>
-                    <a href="{{ route('admin.users.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                        Back to Users
-                    </a>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- User Info -->
-                <div class="lg:col-span-1">
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">User Information</h2>
-                        
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Name</label>
-                                <p class="text-sm text-gray-900">{{ $user->name }}</p>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Email</label>
-                                <p class="text-sm text-gray-900">{{ $user->email }}</p>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Role</label>
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
-                                    @if($user->role === 'admin') bg-red-100 text-red-800
-                                    @elseif($user->role === 'leader') bg-blue-100 text-blue-800
-                                    @else bg-gray-100 text-gray-800 @endif">
-                                    {{ ucfirst($user->role) }}
-                                </span>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Status</label>
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
-                                    {{ $user->email_verified_at ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                                    {{ $user->email_verified_at ? 'Active' : 'Inactive' }}
-                                </span>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Joined</label>
-                                <p class="text-sm text-gray-900">{{ $user->created_at->format('M d, Y') }}</p>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-500">Last Updated</label>
-                                <p class="text-sm text-gray-900">{{ $user->updated_at->format('M d, Y') }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Reading Statistics -->
-                    <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Reading Statistics</h2>
-                        
-                        <div class="space-y-4">
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Reading Plans</span>
-                                <span class="text-sm font-medium text-gray-900">{{ $readingStats['total_plans'] }}</span>
-                            </div>
-                            
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Completed Readings</span>
-                                <span class="text-sm font-medium text-gray-900">{{ $readingStats['completed_readings'] }}</span>
-                            </div>
-                            
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Completion Rate</span>
-                                <span class="text-sm font-medium text-gray-900">{{ $readingStats['completion_rate'] }}%</span>
-                            </div>
-                            
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Current Streak</span>
-                                <span class="text-sm font-medium text-gray-900">{{ $readingStats['current_streak'] }} days</span>
-                            </div>
-                            
-                            <div class="flex justify-between">
-                                <span class="text-sm text-gray-500">Longest Streak</span>
-                                <span class="text-sm font-medium text-gray-900">{{ $readingStats['longest_streak'] }} days</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Reading Plans and Activity -->
-                <div class="lg:col-span-2 space-y-6">
-                    <!-- Reading Plans -->
-                    <div class="bg-white rounded-lg shadow-md">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-lg font-medium text-gray-900">Reading Plans</h2>
-                        </div>
-                        
-                        <div class="p-6">
-                            @forelse($user->readingPlans as $plan)
-                                <div class="border rounded-lg p-4 mb-4 last:mb-0">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="text-lg font-medium text-gray-900">{{ $plan->name }}</h3>
-                                            <p class="text-sm text-gray-600 mt-1">{{ $plan->description }}</p>
-                                            <div class="mt-2 text-sm text-gray-500">
-                                                <span>Joined: {{ $plan->pivot->joined_at ? $plan->pivot->joined_at->format('M d, Y') : 'N/A' }}</span>
-                                                <span class="mx-2">•</span>
-                                                <span>Current Day: {{ $plan->pivot->current_day }}</span>
-                                            </div>
-                                        </div>
-                                        <span class="px-3 py-1 text-sm text-blue-700 bg-blue-100 rounded-full">
-                                            {{ $plan->duration_days }} days
-                                        </span>
-                                    </div>
-                                    
-                                    @php
-                                        $completedCount = $user->readingProgress()
-                                            ->whereHas('dailyReading', function($q) use ($plan) {
-                                                $q->where('reading_plan_id', $plan->id);
-                                            })->count();
-                                        $totalCount = $plan->dailyReadings->count();
-                                        $progressPercentage = $totalCount > 0 ? round(($completedCount / $totalCount) * 100, 1) : 0;
-                                    @endphp
-                                    
-                                    <div class="mt-4">
-                                        <div class="flex justify-between text-sm text-gray-600 mb-1">
-                                            <span>Progress</span>
-                                            <span>{{ $completedCount }}/{{ $totalCount }} ({{ $progressPercentage }}%)</span>
-                                        </div>
-                                        <div class="w-full bg-gray-200 rounded-full h-2">
-                                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $progressPercentage }}%"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @empty
-                                <p class="text-gray-500 text-center py-8">No reading plans assigned.</p>
-                            @endforelse
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="bg-white rounded-lg shadow-md">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-lg font-medium text-gray-900">Recent Activity</h2>
-                        </div>
-                        
-                        <div class="divide-y divide-gray-200">
-                            @forelse($recentActivity as $activity)
-                                <div class="px-6 py-4">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-900">
-                                                Completed: {{ $activity->dailyReading->reading_range }}
-                                            </p>
-                                            <p class="text-sm text-gray-600">
-                                                {{ $activity->dailyReading->readingPlan->name }} - Day {{ $activity->dailyReading->day_number }}
-                                            </p>
-                                        </div>
-                                        <span class="text-sm text-gray-500">
-                                            {{ $activity->completed_date->format('M d, Y') }}
-                                        </span>
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="px-6 py-8 text-center text-gray-500">
-                                    No recent activity.
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <x-slot name="header">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900">{{ $user->name }}</h1>
         </div>
+    </x-slot>
+
+    <div class="space-y-6">
+        <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-sky-700 text-white shadow-2xl shadow-slate-900/15">
+            <div class="grid gap-6 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:px-10">
+                <div class="flex items-start gap-4">
+                    <img class="h-16 w-16 rounded-[1.5rem] object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=ffffff&color=0f172a" alt="{{ $user->name }}">
+                    <div>
+                        <span class="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-100">
+                            {{ $user->roleLabel() }}
+                        </span>
+                        <h2 class="mt-4 text-3xl font-semibold">{{ $user->name }}</h2>
+                        <p class="mt-2 text-sm text-slate-200">{{ $user->email }}</p>
+                        @if($user->phone_number)
+                            <p class="mt-1 text-sm text-slate-300">{{ $user->phone_number }}</p>
+                        @endif
+                        <p class="mt-3 text-sm text-slate-300">Joined {{ $user->created_at->format('M d, Y') }}</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row lg:flex-col">
+                    <a href="{{ route('admin.users.edit', $user) }}" class="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+                        Edit user
+                    </a>
+                    <a href="{{ route('admin.users.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15">
+                        Back to users
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Plans</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ $readingStats['total_plans'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Completions</p>
+                <p class="mt-3 text-3xl font-semibold text-emerald-700">{{ $readingStats['completed_readings'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Completion rate</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ $readingStats['completion_rate'] }}%</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Current streak</p>
+                <p class="mt-3 text-3xl font-semibold text-sky-700">{{ $readingStats['current_streak'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Longest streak</p>
+                <p class="mt-3 text-3xl font-semibold text-amber-700">{{ $readingStats['longest_streak'] }}</p>
+            </article>
+        </section>
+
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Enrollment</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Reading plans</h2>
+                </div>
+
+                <div class="mt-6 space-y-4">
+                    @forelse($user->readingPlans as $plan)
+                        @php
+                            $completedCount = $user->readingProgress()
+                                ->whereHas('dailyReading', function ($query) use ($plan) {
+                                    $query->where('reading_plan_id', $plan->id);
+                                })
+                                ->count();
+                            $totalCount = $plan->dailyReadings->count();
+                            $progressPercentage = $totalCount > 0 ? round(($completedCount / $totalCount) * 100, 1) : 0;
+                        @endphp
+                        <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-lg font-semibold text-slate-900">{{ $plan->name }}</h3>
+                                        <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">{{ $plan->type_label }}</span>
+                                    </div>
+                                    <p class="mt-2 text-sm text-slate-500">{{ $plan->description ?: 'No plan description yet.' }}</p>
+                                    <p class="mt-3 text-xs text-slate-500">
+                                        Joined {{ $plan->pivot->joined_date ? \Illuminate\Support\Carbon::parse($plan->pivot->joined_date)->format('M d, Y') : 'N/A' }}
+                                        · Current day {{ $plan->pivot->current_day }}
+                                    </p>
+                                </div>
+                                <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                    {{ $plan->cadence_description }}
+                                </span>
+                            </div>
+
+                            <div class="mt-5">
+                                <div class="flex items-center justify-between text-sm text-slate-500">
+                                    <span>Progress</span>
+                                    <span>{{ $completedCount }}/{{ $totalCount }} · {{ $progressPercentage }}%</span>
+                                </div>
+                                <div class="mt-2 h-2.5 rounded-full bg-slate-200">
+                                    <div class="h-2.5 rounded-full bg-emerald-500" style="width: {{ min(100, $progressPercentage) }}%"></div>
+                                </div>
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rounded-[1.5rem] border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
+                            No reading plans are assigned to this user yet.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Account summary</p>
+                    <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Status</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->email_verified_at ? 'Active' : 'Inactive' }}</p>
+                        </div>
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Hierarchy</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->hierarchy?->name ?? 'Unassigned' }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ $user->hierarchy?->parent?->name ?? ($user->hierarchy ? ucfirst($user->hierarchy->type) : 'No group yet') }}</p>
+                        </div>
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Last updated</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->updated_at->format('M d, Y') }}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Activity feed</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Recent completions</h2>
+                    </div>
+
+                    <div class="mt-6 space-y-3">
+                        @forelse($recentActivity as $activity)
+                            <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                                <p class="text-sm font-semibold text-slate-900">{{ $activity->dailyReading->reading_range }}</p>
+                                <p class="mt-1 text-sm text-slate-500">{{ $activity->dailyReading->readingPlan->name }} · Day {{ $activity->dailyReading->day_number }}</p>
+                                <p class="mt-3 text-xs text-slate-400">{{ $activity->completed_date->format('M d, Y') }}</p>
+                            </div>
+                        @empty
+                            <div class="rounded-[1.5rem] border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
+                                No recent activity recorded.
+                            </div>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+        </section>
     </div>
 </x-admin-layout>

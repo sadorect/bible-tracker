@@ -1,227 +1,257 @@
 <x-admin-layout>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="mb-6 flex justify-between items-center">
-                <h1 class="text-2xl font-semibold text-gray-900">Plan Progress: {{ $readingPlan->name }}</h1>
-                
+    <x-slot name="header">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Reporting</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Plan progress: {{ $readingPlan->name }}</h1>
+        </div>
+    </x-slot>
+
+    <div class="space-y-6">
+        <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-sky-700 text-white shadow-2xl shadow-slate-900/15">
+            <div class="grid gap-6 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:px-10">
                 <div>
-                    <a href="{{ route('admin.progress.index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
-                        Back to Progress Dashboard
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-100">Plan analytics</p>
+                    <h2 class="mt-3 text-3xl font-semibold">{{ $readingPlan->name }}</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-slate-200">{{ $readingPlan->description ?: 'No description yet.' }}</p>
+                    <p class="mt-3 text-sm text-slate-300">{{ ucfirst(str_replace('_', ' ', $readingPlan->type)) }} · {{ $readingPlan->streak_days }} days on, {{ $readingPlan->break_days }} day break</p>
+                </div>
+                <div class="flex items-end">
+                    <a href="{{ route('admin.progress.index') }}" class="inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+                        Back to progress dashboard
                     </a>
                 </div>
             </div>
-            
-            <!-- Plan Info Card -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div class="flex flex-col md:flex-row md:justify-between">
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-900">{{ $readingPlan->name }}</h2>
-                        <p class="text-gray-600 mt-1">{{ $readingPlan->description }}</p>
-                        <p class="text-gray-600 mt-1">
-                            <span class="font-medium">Type:</span> {{ ucfirst(str_replace('_', ' ', $readingPlan->type)) }}
-                        </p>
-                    </div>
-                    <div class="mt-4 md:mt-0 md:text-right">
-                        <p class="text-gray-600">
-                            <span class="font-medium">Started:</span> {{ Carbon\Carbon::parse($readingPlan->start_date)->format('M d, Y') }}
-                        </p>
-                        <p class="text-gray-600">
-                            <span class="font-medium">Reading Pattern:</span> {{ $readingPlan->streak_days }} days on, {{ $readingPlan->break_days }} days off
-                        </p>
-                        <p class="text-gray-600">
-                            <span class="font-medium">Status:</span> 
-                            @if($readingPlan->is_active)
-                                <span class="text-green-600">Active</span>
-                            @else
-                                <span class="text-red-600">Inactive</span>
-                            @endif
-                        </p>
-                    </div>
+        </section>
+
+        <section class="grid gap-4 sm:grid-cols-3">
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total completions</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($totalCompletions) }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total users</p>
+                <p class="mt-3 text-3xl font-semibold text-emerald-700">{{ number_format($totalUsers) }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Active users</p>
+                <p class="mt-3 text-3xl font-semibold text-sky-700">{{ number_format($activeUsers) }}</p>
+            </article>
+        </section>
+
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Trendline</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Completion trend</h2>
                 </div>
-            </div>
-            
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Total Completions</h3>
-                    <p class="text-3xl font-bold text-gray-900">{{ number_format($totalCompletions) }}</p>
-                </div>
-                
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Total Users</h3>
-                    <p class="text-3xl font-bold text-gray-900">{{ number_format($totalUsers) }}</p>
-                </div>
-                
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Active Users</h3>
-                    <p class="text-3xl font-bold text-gray-900">{{ number_format($activeUsers) }}</p>
-                </div>
-            </div>
-            
-            <!-- Chart -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-4">Completion Trend (Last 30 Days)</h2>
-                <div style="height: 300px;">
+                <div class="mt-6 h-[320px]">
                     <canvas id="planCompletionChart"></canvas>
                 </div>
             </div>
-            
-            <!-- User Progress Table -->
-            <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-medium text-gray-900">User Progress</h2>
+
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Cohort summary</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Plan details</h2>
                 </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    User
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Current Day
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Current Streak
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Completion Rate
-                                </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($userStats as $stat)
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <a href="{{ route('admin.progress.user', $stat['user']) }}" class="text-blue-600 hover:text-blue-800">
+                <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Started</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ \Carbon\Carbon::parse($readingPlan->start_date)->format('M d, Y') }}</p>
+                    </div>
+                    <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Status</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->is_active ? 'Active' : 'Inactive' }}</p>
+                    </div>
+                    <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Training days</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->training_days }}</p>
+                    </div>
+                    <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Reading cadence</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->cadence_description }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section
+            class="overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-slate-900/5"
+            data-table-columns="admin-plan-progress-users"
+            data-default-columns='{"status":true,"current-day":false,"current-streak":false,"completion-rate":false}'
+            data-default-columns-md='{"current-day":true,"completion-rate":true}'
+            data-default-columns-xl='{"current-streak":true}'
+        >
+            <div class="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Participant ranking</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">User progress</h2>
+                </div>
+                <details class="relative">
+                    <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900">
+                        <i class="fas fa-table-columns text-slate-400"></i>
+                        Display columns
+                        <i class="fas fa-chevron-down text-xs text-slate-400"></i>
+                    </summary>
+                    <div class="absolute right-0 z-10 mt-3 w-72 rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/10">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Participant table</p>
+                        <p class="mt-2 text-sm text-slate-500">Choose how much progress detail stays visible in this ranking view.</p>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <label class="flex items-center gap-3 text-sm text-slate-700">
+                                <input type="checkbox" data-column-toggle="status" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                Status
+                            </label>
+                            <label class="flex items-center gap-3 text-sm text-slate-700">
+                                <input type="checkbox" data-column-toggle="current-day" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                Current day
+                            </label>
+                            <label class="flex items-center gap-3 text-sm text-slate-700">
+                                <input type="checkbox" data-column-toggle="current-streak" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                Current streak
+                            </label>
+                            <label class="flex items-center gap-3 text-sm text-slate-700">
+                                <input type="checkbox" data-column-toggle="completion-rate" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                Completion rate
+                            </label>
+                        </div>
+                        <button type="button" data-table-columns-reset class="mt-4 inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900">
+                            Reset compact defaults
+                        </button>
+                    </div>
+                </details>
+            </div>
+
+            <div class="overflow-x-auto" data-table-columns-root>
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr class="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <th class="px-6 py-4">User</th>
+                            <th class="px-6 py-4" data-column="status">Status</th>
+                            <th class="px-6 py-4" data-column="current-day">Current day</th>
+                            <th class="px-6 py-4" data-column="current-streak">Current streak</th>
+                            <th class="px-6 py-4" data-column="completion-rate">Completion rate</th>
+                            <th class="px-6 py-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        @forelse($userStats as $stat)
+                            <tr class="transition hover:bg-slate-50/80">
+                                <td class="px-6 py-5">
+                                    <div>
+                                        <a href="{{ route('admin.progress.user', $stat['user']) }}" class="text-sm font-semibold text-slate-900 transition hover:text-emerald-700">
                                             {{ $stat['user']->name }}
                                         </a>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @if($stat['is_active'])
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Active
+                                        <div class="mt-2 flex flex-wrap gap-2 text-xs md:hidden">
+                                            <span class="inline-flex rounded-full px-2.5 py-1 font-semibold {{ $stat['is_active'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700' }}">
+                                                {{ $stat['is_active'] ? 'Active' : 'Inactive' }}
                                             </span>
-                                        @else
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                                Inactive
+                                            <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                                                Day {{ $stat['current_day'] }}
                                             </span>
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        Day {{ $stat['current_day'] }} of {{ $stat['total_days'] }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        {{ $stat['current_streak'] }} days
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ min(100, $stat['completion_rate']) }}%"></div>
-                                            </div>
-                                            <span class="ml-2 text-sm font-medium text-gray-900">{{ number_format($stat['completion_rate'], 1) }}%</span>
+                                            <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 font-medium text-sky-700">
+                                                {{ number_format($stat['completion_rate'], 0) }}%
+                                            </span>
                                         </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="{{ route('admin.progress.user', $stat['user']) }}" class="text-blue-600 hover:text-blue-800">
-                                            View User
-                                        </a>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                        No users are enrolled in this reading plan.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5" data-column="status">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $stat['is_active'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700' }}">
+                                        {{ $stat['is_active'] ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 text-sm text-slate-600" data-column="current-day">Day {{ $stat['current_day'] }} of {{ $stat['total_days'] }}</td>
+                                <td class="px-6 py-5 text-sm text-slate-600" data-column="current-streak">{{ $stat['current_streak'] }} days</td>
+                                <td class="px-6 py-5" data-column="completion-rate">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-2.5 w-28 rounded-full bg-slate-200">
+                                            <div class="h-2.5 rounded-full bg-emerald-500" style="width: {{ min(100, $stat['completion_rate']) }}%"></div>
+                                        </div>
+                                        <span class="text-sm text-slate-600">{{ number_format($stat['completion_rate'], 1) }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5">
+                                    <a href="{{ route('admin.progress.user', $stat['user']) }}" class="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-200">
+                                        View user
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-14 text-center text-sm text-slate-500">
+                                    No users are enrolled in this reading plan.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
-            
-            <!-- Recent Activity -->
-            <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-medium text-gray-900">Recent Activity</h2>
-                </div>
-                
-                <div class="divide-y divide-gray-200">
-                    @forelse($recentActivity as $activity)
-                        <div class="px-6 py-4">
-                            <div class="flex justify-between">
-                                <div>
-                                    <p class="text-gray-900">
-                                        <a href="{{ route('admin.progress.user', $activity->user) }}" class="font-medium text-blue-600 hover:text-blue-800">
-                                            {{ $activity->user->name }}
-                                        </a> 
-                                        completed <span class="font-medium">{{ $activity->dailyReading->reading_range }}</span>
-                                    </p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-gray-900">
-                                        {{ Carbon\Carbon::parse($activity->completed_date)->format('M d, Y') }}
-                                    </p>
-                                    <p class="text-sm text-gray-600">
-                                        {{ Carbon\Carbon::parse($activity->completed_date)->format('g:i A') }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="px-6 py-4 text-center text-gray-500">
-                            No recent activity found.
-                        </div>
-                    @endforelse
-                </div>
+        </section>
+
+        <section class="overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-slate-900/5">
+            <div class="border-b border-slate-200 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Recent activity</p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">Latest completions</h2>
             </div>
-        </div>
+
+            <div class="divide-y divide-slate-200">
+                @forelse($recentActivity as $activity)
+                    <div class="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-slate-600">
+                                <a href="{{ route('admin.progress.user', $activity->user) }}" class="font-semibold text-slate-900 transition hover:text-emerald-700">{{ $activity->user->name }}</a>
+                                completed <span class="font-semibold">{{ $activity->dailyReading->reading_range }}</span>
+                            </p>
+                        </div>
+                        <div class="text-left sm:text-right">
+                            <p class="text-sm font-medium text-slate-900">{{ \Carbon\Carbon::parse($activity->completed_date)->format('M d, Y') }}</p>
+                            <p class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($activity->completed_date)->format('g:i A') }}</p>
+                        </div>
+                    </div>
+                @empty
+                    <div class="px-6 py-14 text-center text-sm text-slate-500">
+                        No recent activity found.
+                    </div>
+                @endforelse
+            </div>
+        </section>
     </div>
-    
+
     @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('planCompletionChart').getContext('2d');
-            
-            const labels = {!! $chartLabels !!};
-            const data = {!! $chartData !!};
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Reading Completions',
-                        data: data,
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                precision: 0
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const ctx = document.getElementById('planCompletionChart').getContext('2d');
+                const labels = {!! $chartLabels !!};
+                const data = {!! $chartData !!};
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Reading Completions',
+                            data: data,
+                            backgroundColor: 'rgba(14, 165, 233, 0.12)',
+                            borderColor: 'rgba(14, 165, 233, 1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointBackgroundColor: 'rgba(14, 165, 233, 1)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
                             }
                         }
                     }
-                }
+                });
             });
-        });
-    </script>
+        </script>
     @endpush
 </x-admin-layout>

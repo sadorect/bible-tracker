@@ -1,302 +1,454 @@
 <x-admin-layout>
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-semibold text-gray-900">User Management</h1>
-                <a href="{{ route('admin.users.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                    Add New User
-                </a>
-            </div>
+    <x-slot name="header">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Manage members, leaders, and admin access.</h1>
+        </div>
+    </x-slot>
 
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Total Users</h3>
-                    <p class="text-3xl font-bold text-gray-900">{{ number_format($stats['total_users']) }}</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Active Users</h3>
-                    <p class="text-3xl font-bold text-green-600">{{ number_format($stats['active_users']) }}</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Leaders</h3>
-                    <p class="text-3xl font-bold text-blue-600">{{ number_format($stats['leaders']) }}</p>
-                </div>
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">Members</h3>
-                    <p class="text-3xl font-bold text-purple-600">{{ number_format($stats['members']) }}</p>
-                </div>
-            </div>
+    <div class="space-y-6">
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total users</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($stats['total_users']) }}</p>
+                <p class="mt-2 text-sm text-slate-500">Everyone currently registered in the movement.</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Active users</p>
+                <p class="mt-3 text-3xl font-semibold text-emerald-700">{{ number_format($stats['active_users']) }}</p>
+                <p class="mt-2 text-sm text-slate-500">Email-verified readers ready to participate.</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Leaders</p>
+                <p class="mt-3 text-3xl font-semibold text-sky-700">{{ number_format($stats['leaders']) }}</p>
+                <p class="mt-2 text-sm text-slate-500">Accounts currently assigned to a leadership role.</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Members</p>
+                <p class="mt-3 text-3xl font-semibold text-amber-700">{{ number_format($stats['members']) }}</p>
+                <p class="mt-2 text-sm text-slate-500">Readers who are being guided through cohorts.</p>
+            </article>
+        </section>
 
-            <!-- Filters and Search -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <form method="GET" action="{{ route('admin.users.index') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                        <input type="text" name="search" id="search" value="{{ request('search') }}" 
-                               placeholder="Name or email..." 
-                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Directory filters</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Narrow the user list quickly</h2>
                     </div>
-                    
-                    <div>
-                        <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                        <select name="role" id="role" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">All Roles</option>
-                            <option value="leader" {{ request('role') === 'leader' ? 'selected' : '' }}>Leader</option>
-                            <option value="member" {{ request('role') === 'member' ? 'selected' : '' }}>Member</option>                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select name="status" id="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">All Status</option>
+                    <a href="{{ route('admin.users.create') }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        Add new user
+                    </a>
+                </div>
+
+                <form method="GET" action="{{ route('admin.users.index') }}" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Search</span>
+                        <input
+                            type="text"
+                            name="search"
+                            id="search"
+                            value="{{ request('search') }}"
+                            placeholder="Name or email"
+                            class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500"
+                        >
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Role</span>
+                        <select name="role" id="role" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">All roles</option>
+                            @foreach($stats['roles'] as $value => $label)
+                                <option value="{{ $value }}" {{ request('role') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Status</span>
+                        <select name="status" id="status" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">All statuses</option>
                             <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
                             <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
                         </select>
-                    </div>
-                    
-                    <div>
-                        <label for="reading_plan" class="block text-sm font-medium text-gray-700 mb-1">Reading Plan</label>
-                        <select name="reading_plan" id="reading_plan" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">All Plans</option>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Reading plan</span>
+                        <select name="reading_plan" id="reading_plan" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">All plans</option>
                             @foreach($readingPlans as $plan)
                                 <option value="{{ $plan->id }}" {{ request('reading_plan') == $plan->id ? 'selected' : '' }}>
                                     {{ $plan->name }}
                                 </option>
                             @endforeach
                         </select>
-                    </div>
-                    
-                    <div class="flex items-end">
-                        <button type="submit" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
-                            Filter
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Rows per page</span>
+                        <select name="per_page" id="per_page" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            @foreach($allowedPerPage as $pageSize)
+                                <option value="{{ $pageSize }}" {{ $perPage === $pageSize ? 'selected' : '' }}>{{ $pageSize }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <div class="flex flex-col justify-end gap-3 sm:flex-row md:col-span-2 xl:col-span-1 xl:flex-col">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            Apply filters
                         </button>
+                        <a href="{{ route('admin.users.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                            Reset
+                        </a>
                     </div>
                 </form>
             </div>
 
-            <!-- Bulk Actions -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <form id="bulk-action-form" method="POST" action="{{ route('admin.users.bulk-action') }}">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <form id="bulk-action-form" method="POST" action="{{ route('admin.users.bulk-action') }}" class="space-y-5">
                     @csrf
-                    <div class="flex flex-wrap items-center gap-4">
-                        <div>
-                            <label for="bulk-action" class="block text-sm font-medium text-gray-700 mb-1">Bulk Actions</label>
-                            <select name="action" id="bulk-action" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Select Action</option>
-                                <option value="assign_plan">Assign Reading Plan</option>
-                                <option value="remove_plan">Remove Reading Plan</option>
-                                <option value="change_role">Change Role</option>
-                                <option value="delete">Delete Users</option>
-                            </select>
-                        </div>
-                        
-                        <div id="reading-plan-select" class="hidden">
-                            <label for="bulk-reading-plan" class="block text-sm font-medium text-gray-700 mb-1">Reading Plan</label>
-                            <select name="reading_plan_id" id="bulk-reading-plan" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Select Plan</option>
+
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Bulk actions</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Apply one action to many users</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">Select users from the table below, then choose a shared action here.</p>
+                    </div>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Action</span>
+                        <select name="action" id="bulk-action" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select action</option>
+                            <option value="assign_plan">Assign reading plan</option>
+                            <option value="remove_plan">Remove reading plan</option>
+                            <option value="change_role">Change role</option>
+                            <option value="assign_hierarchy">Assign group</option>
+                            <option value="clear_hierarchy">Clear group</option>
+                            <option value="delete">Delete users</option>
+                        </select>
+                    </label>
+
+                    <div id="reading-plan-select" class="hidden">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Reading plan</span>
+                            <select name="reading_plan_id" id="bulk-reading-plan" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Select plan</option>
                                 @foreach($readingPlans as $plan)
                                     <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                                 @endforeach
                             </select>
-                        </div>
-                        
-                        <div id="role-select" class="hidden">
-                            <label for="bulk-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                            <select name="role" id="bulk-role" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Select Role</option>
-                                <option value="admin">Admin</option>
-                                <option value="leader">Leader</option>
-                                <option value="member">Member</option>
-                            </select>
-                        </div>
-                        
-                        <div class="flex items-end">
-                            <button type="submit" id="bulk-submit" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg" disabled>
-                                Apply
-                            </button>
-                        </div>
+                        </label>
                     </div>
+
+                    <div id="role-select" class="hidden">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">New role</span>
+                            <select name="role" id="bulk-role" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Select role</option>
+                                @foreach($stats['roles'] as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+
+                    <div id="hierarchy-select" class="hidden">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Group</span>
+                            <select name="hierarchy_id" id="bulk-hierarchy" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Select group</option>
+                                @foreach($hierarchies as $hierarchy)
+                                    <option value="{{ $hierarchy->id }}">{{ $hierarchy->displayPath() }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
+
+                    <button type="submit" id="bulk-submit" disabled class="inline-flex w-full items-center justify-center rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">
+                        Apply to selected users
+                    </button>
                 </form>
             </div>
+        </section>
 
-            <!-- Users Table -->
-            <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-medium text-gray-900">Users ({{ $users->total() }})</h2>
+        <section
+            class="rounded-[2rem] bg-white shadow-xl shadow-slate-900/5"
+            data-table-columns="admin-user-directory"
+            data-default-columns='{"role":true,"group":true,"status":false,"plans":false,"completions":false,"joined":false}'
+            data-default-columns-md='{"status":true,"plans":true}'
+            data-default-columns-xl='{"completions":true,"joined":true}'
+        >
+            <div class="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">User directory</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Users ({{ $users->total() }})</h2>
                 </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <input type="checkbox" id="select-all" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reading Plans</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($users as $user)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <input type="checkbox" name="user_ids[]" value="{{ $user->id }}" class="user-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                                                    <span class="text-sm font-medium text-gray-700">
-                                                        {{ strtoupper(substr($user->name, 0, 2)) }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
-                                                <div class="text-sm text-gray-500">{{ $user->email }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
-                                            @if($user->role === 'admin') bg-red-100 text-red-800
-                                            @elseif($user->role === 'leader') bg-blue-100 text-blue-800
-                                            @else bg-gray-100 text-gray-800 @endif">
-                                            {{ ucfirst($user->role) }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
-                                            {{ $user->email_verified_at ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                                            {{ $user->email_verified_at ? 'Active' : 'Inactive' }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $user->reading_plans_count }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $user->reading_progress_count }} completions
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {{ $user->created_at->format('M d, Y') }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div class="flex space-x-2">
-                                            <a href="{{ route('admin.users.show', $user) }}" class="text-blue-600 hover:text-blue-900">View</a>
-                                            <a href="{{ route('admin.users.edit', $user) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                            @if($user->role !== 'admin' || \App\Models\User::where('role', 'admin')->count() > 1)
-                                                <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline" 
-                                                      onsubmit="return confirm('Are you sure you want to delete this user?')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="px-6 py-4 text-center text-gray-500">
-                                        No users found.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Pagination -->
-                <div class="px-6 py-4 border-t border-gray-200">
-                    {{ $users->links() }}
+                <div class="flex flex-col gap-3 sm:items-end">
+                    <p class="text-sm text-slate-500">Select rows for bulk actions, or manage each user individually. Showing {{ $users->count() }} of {{ $users->total() }} users.</p>
+                    <details class="relative">
+                        <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900">
+                            <i class="fas fa-table-columns text-slate-400"></i>
+                            Display columns
+                            <i class="fas fa-chevron-down text-xs text-slate-400"></i>
+                        </summary>
+                        <div class="absolute right-0 z-10 mt-3 w-72 rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/10">
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Directory view</p>
+                            <p class="mt-2 text-sm text-slate-500">Choose which optional columns stay visible on this device.</p>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="role" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Role
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="group" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Group
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="status" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Status
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="plans" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Plans
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="completions" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Completions
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="joined" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Joined
+                                </label>
+                            </div>
+                            <button type="button" data-table-columns-reset class="mt-4 inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900">
+                                Reset compact defaults
+                            </button>
+                        </div>
+                    </details>
                 </div>
             </div>
-        </div>
+
+            <div class="overflow-x-auto" data-table-columns-root>
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr class="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <th class="px-6 py-4">
+                                <input type="checkbox" id="select-all" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            </th>
+                            <th class="px-6 py-4">User</th>
+                            <th class="px-6 py-4" data-column="role">Role</th>
+                            <th class="px-6 py-4" data-column="group">Group</th>
+                            <th class="px-6 py-4" data-column="status">Status</th>
+                            <th class="px-6 py-4" data-column="plans">Plans</th>
+                            <th class="px-6 py-4" data-column="completions">Completions</th>
+                            <th class="px-6 py-4" data-column="joined">Joined</th>
+                            <th class="px-6 py-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        @forelse($users as $user)
+                            @php
+                                $roleClasses = match ($user->role) {
+                                    'admin' => 'bg-rose-100 text-rose-700',
+                                    \App\Models\User::ROLE_CLAN_LEADER,
+                                    \App\Models\User::ROLE_PLATOON_LEADER,
+                                    \App\Models\User::ROLE_SQUAD_LEADER,
+                                    \App\Models\User::ROLE_BATCH_LEADER,
+                                    \App\Models\User::ROLE_TEAM_LEADER => 'bg-sky-100 text-sky-700',
+                                    default => 'bg-slate-100 text-slate-700',
+                                };
+                                $statusClasses = $user->email_verified_at
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-amber-100 text-amber-700';
+                            @endphp
+                            <tr class="align-top transition hover:bg-slate-50/80">
+                                <td class="px-6 py-5">
+                                    <input type="checkbox" name="user_ids[]" value="{{ $user->id }}" class="user-checkbox rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                </td>
+                                <td class="px-6 py-5">
+                                    <div class="flex items-center gap-4">
+                                        <img
+                                            class="h-11 w-11 rounded-2xl object-cover"
+                                            src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=0f172a&color=fff"
+                                            alt="{{ $user->name }}"
+                                        >
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
+                                            <p class="text-sm text-slate-500">{{ $user->email }}</p>
+                                            @if($user->phone_number)
+                                                <p class="mt-1 text-xs text-slate-400">{{ $user->phone_number }}</p>
+                                            @endif
+                                            <div class="mt-3 flex flex-wrap gap-2 text-xs md:hidden">
+                                                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600">{{ $user->roleLabel() }}</span>
+                                                @if($user->hierarchy)
+                                                    <span class="inline-flex rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700">{{ $user->hierarchy->name }}</span>
+                                                @endif
+                                                <span class="inline-flex rounded-full px-2.5 py-1 font-medium {{ $statusClasses }}">{{ $user->email_verified_at ? 'Active' : 'Inactive' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5" data-column="role">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $roleClasses }}">
+                                        {{ $user->roleLabel() }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5" data-column="group">
+                                    @if($user->hierarchy)
+                                        <div title="{{ $user->hierarchy->displayPath() }}">
+                                            <p class="text-sm font-medium text-slate-900">{{ $user->hierarchy->name }}</p>
+                                            <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{{ $user->hierarchy->type }}</p>
+                                        </div>
+                                    @else
+                                        <span class="text-sm text-slate-500">Unassigned</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-5" data-column="status">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $statusClasses }}">
+                                        {{ $user->email_verified_at ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 text-sm text-slate-600" data-column="plans">
+                                    {{ $user->reading_plans_count }}
+                                </td>
+                                <td class="px-6 py-5 text-sm text-slate-600" data-column="completions">
+                                    {{ $user->reading_progress_count }}
+                                </td>
+                                <td class="px-6 py-5 text-sm text-slate-500" data-column="joined">
+                                    {{ $user->created_at->format('M d, Y') }}
+                                </td>
+                                <td class="px-6 py-5">
+                                    <div class="flex flex-wrap gap-2 text-sm font-medium">
+                                        <a href="{{ route('admin.users.show', $user) }}" class="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 transition hover:bg-slate-200">
+                                            View
+                                        </a>
+                                        <a href="{{ route('admin.users.edit', $user) }}" class="inline-flex rounded-full bg-sky-100 px-3 py-1.5 text-sky-700 transition hover:bg-sky-200">
+                                            Edit
+                                        </a>
+                                        @if($user->role !== 'admin' || \App\Models\User::where('role', 'admin')->count() > 1)
+                                            <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline" onsubmit="return confirm('Are you sure you want to delete this user?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="inline-flex rounded-full bg-rose-100 px-3 py-1.5 text-rose-700 transition hover:bg-rose-200">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="9" class="px-6 py-16 text-center text-sm text-slate-500">
+                                    No users match the current filters.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-t border-slate-200 px-6 py-4">
+                {{ $users->links() }}
+            </div>
+        </section>
     </div>
 
     @push('scripts')
-    <script>
-        // Handle select all checkbox
-        document.getElementById('select-all').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.user-checkbox');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
+        <script>
+            document.getElementById('select-all').addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('.user-checkbox');
+                checkboxes.forEach((checkbox) => {
+                    checkbox.checked = this.checked;
+                });
+                updateBulkActions();
             });
-            updateBulkActions();
-        });
 
-                // Handle individual checkboxes
-                document.querySelectorAll('.user-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', updateBulkActions);
-        });
+            document.querySelectorAll('.user-checkbox').forEach((checkbox) => {
+                checkbox.addEventListener('change', updateBulkActions);
+            });
 
-        // Handle bulk action selection
-        document.getElementById('bulk-action').addEventListener('change', function() {
-            const action = this.value;
-            const readingPlanSelect = document.getElementById('reading-plan-select');
-            const roleSelect = document.getElementById('role-select');
-            
-            // Hide all conditional selects
-            readingPlanSelect.classList.add('hidden');
-            roleSelect.classList.add('hidden');
-            
-            // Show relevant select based on action
-            if (action === 'assign_plan' || action === 'remove_plan') {
-                readingPlanSelect.classList.remove('hidden');
-            } else if (action === 'change_role') {
-                roleSelect.classList.remove('hidden');
+            document.getElementById('bulk-reading-plan').addEventListener('change', updateBulkActions);
+            document.getElementById('bulk-role').addEventListener('change', updateBulkActions);
+            document.getElementById('bulk-hierarchy').addEventListener('change', updateBulkActions);
+
+            document.getElementById('bulk-action').addEventListener('change', function() {
+                const action = this.value;
+                const readingPlanSelect = document.getElementById('reading-plan-select');
+                const roleSelect = document.getElementById('role-select');
+                const hierarchySelect = document.getElementById('hierarchy-select');
+
+                readingPlanSelect.classList.add('hidden');
+                roleSelect.classList.add('hidden');
+                hierarchySelect.classList.add('hidden');
+
+                if (action === 'assign_plan' || action === 'remove_plan') {
+                    readingPlanSelect.classList.remove('hidden');
+                } else if (action === 'change_role') {
+                    roleSelect.classList.remove('hidden');
+                } else if (action === 'assign_hierarchy') {
+                    hierarchySelect.classList.remove('hidden');
+                }
+
+                updateBulkActions();
+            });
+
+            function updateBulkActions() {
+                const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+                const bulkSubmit = document.getElementById('bulk-submit');
+                const bulkAction = document.getElementById('bulk-action');
+                const action = bulkAction.value;
+                const selectedCount = selectedCheckboxes.length;
+                const readingPlanValue = document.getElementById('bulk-reading-plan').value;
+                const roleValue = document.getElementById('bulk-role').value;
+                const hierarchyValue = document.getElementById('bulk-hierarchy').value;
+
+                let actionReady = action.length > 0;
+
+                if (action === 'assign_plan' || action === 'remove_plan') {
+                    actionReady = readingPlanValue.length > 0;
+                } else if (action === 'change_role') {
+                    actionReady = roleValue.length > 0;
+                } else if (action === 'assign_hierarchy') {
+                    actionReady = hierarchyValue.length > 0;
+                }
+
+                bulkSubmit.disabled = !(selectedCount > 0 && actionReady);
             }
-            
-            updateBulkActions();
-        });
 
-        function updateBulkActions() {
-            const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
-            const bulkSubmit = document.getElementById('bulk-submit');
-            const bulkAction = document.getElementById('bulk-action');
-            
-            if (selectedCheckboxes.length > 0 && bulkAction.value) {
-                bulkSubmit.disabled = false;
-            } else {
-                bulkSubmit.disabled = true;
-            }
-        }
+            document.getElementById('bulk-action-form').addEventListener('submit', function(e) {
+                const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+                const action = document.getElementById('bulk-action').value;
 
-        // Handle bulk form submission
-        document.getElementById('bulk-action-form').addEventListener('submit', function(e) {
-            const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
-            const action = document.getElementById('bulk-action').value;
-            
-            if (selectedCheckboxes.length === 0) {
-                e.preventDefault();
-                alert('Please select at least one user.');
-                return;
-            }
-            
-            if (action === 'delete') {
-                if (!confirm(`Are you sure you want to delete ${selectedCheckboxes.length} user(s)?`)) {
+                if (selectedCheckboxes.length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one user.');
+                    return;
+                }
+
+                if (action === 'delete' && ! confirm(`Are you sure you want to delete ${selectedCheckboxes.length} user(s)?`)) {
                     e.preventDefault();
                     return;
                 }
-            }
-            
-            // Add selected user IDs to form
-            selectedCheckboxes.forEach(checkbox => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'user_ids[]';
-                input.value = checkbox.value;
-                this.appendChild(input);
+
+                if (action === 'assign_hierarchy' && ! document.getElementById('bulk-hierarchy').value) {
+                    e.preventDefault();
+                    alert('Please choose a group for the selected users.');
+                    return;
+                }
+
+                this.querySelectorAll('input[name="user_ids[]"][type="hidden"]').forEach((input) => input.remove());
+
+                selectedCheckboxes.forEach((checkbox) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'user_ids[]';
+                    input.value = checkbox.value;
+                    this.appendChild(input);
+                });
             });
-        });
-    </script>
+
+        </script>
     @endpush
 </x-admin-layout>
-

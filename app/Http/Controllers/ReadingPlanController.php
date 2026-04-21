@@ -17,15 +17,20 @@ class ReadingPlanController extends Controller
     {
         $readingPlans = ReadingPlan::all();
         $user = Auth::user();
-        
-        // Get user's active plan if any
-        $activePlan = $user->readingPlans()
-            ->where('user_reading_plans.is_active', true)
-            ->first();
-            
+
+        $activePlan = $user->activeReadingPlan();
+        $joinedPlanIds = $user->readingPlans()->pluck('reading_plans.id')->all();
+
+        foreach ($readingPlans as $plan) {
+            [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $plan);
+            $plan->setAttribute('user_has_joined', in_array($plan->id, $joinedPlanIds, true));
+            $plan->setAttribute('user_can_join', $canJoin);
+            $plan->setAttribute('locked_reason', $lockedReason);
+        }
+
         return view('reading-plans.index', [
             'readingPlans' => $readingPlans,
-            'activePlan' => $activePlan
+            'activePlan' => $activePlan,
         ]);
     }
 
@@ -34,8 +39,17 @@ class ReadingPlanController extends Controller
      */
     public function show(ReadingPlan $readingPlan)
     {
+        $user = Auth::user();
+        $userPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+        [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
+
         return view('reading-plans.show', [
-            'readingPlan' => $readingPlan
+            'readingPlan' => $readingPlan,
+            'userPlan' => $userPlan,
+            'canJoin' => $canJoin,
+            'lockedReason' => $lockedReason,
         ]);
     }
 
@@ -45,51 +59,58 @@ class ReadingPlanController extends Controller
     public function join(ReadingPlan $readingPlan)
     {
         $user = Auth::user();
-        
+
         // Check if user is already in this plan
         $existingPlan = $user->readingPlans()
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
-            
+
         if ($existingPlan) {
             // If already joined but not active, make it active
-            if (!$existingPlan->pivot->is_active) {
+            if (! $existingPlan->pivot->is_active) {
                 // First deactivate any currently active plans
                 $user->readingPlans()
                     ->where('user_reading_plans.is_active', true)
                     ->update(['user_reading_plans.is_active' => false]);
-                    
+
                 // Then activate this plan
                 $user->readingPlans()
                     ->updateExistingPivot($readingPlan->id, [
-                        'is_active' => true
+                        'is_active' => true,
                     ]);
-                    
-                    return redirect()->route('reading-plans.show', $readingPlan)
-                    ->with('success', 'You have resumed the ' . $readingPlan->name . ' reading plan.');
+
+                return redirect()->route('reading-plans.show', $readingPlan)
+                    ->with('success', 'You have resumed the '.$readingPlan->name.' reading plan.');
             }
-            
+
             return redirect()->route('reading-plans.show', $readingPlan)
                 ->with('info', 'You are already participating in this reading plan.');
         }
-        
+
+        [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
+
+        if (! $canJoin) {
+            return redirect()->route('reading-plans.show', $readingPlan)
+                ->with('error', $lockedReason);
+        }
+
         // Deactivate any currently active plans
         $user->readingPlans()
             ->where('user_reading_plans.is_active', true)
             ->update(['user_reading_plans.is_active' => false]);
-            
+
         // Join the new plan
         $user->readingPlans()->attach($readingPlan->id, [
             'joined_date' => Carbon::today(),
             'current_day' => 1,
             'current_streak' => 0,
             'completion_rate' => 0,
-            'is_active' => true
+            'is_active' => true,
         ]);
-        
-      // Redirect to the reading plan show page instead of directly to dashboard
-    return redirect()->route('reading-plans.show', $readingPlan)
-    ->with('success', 'You have joined the ' . $readingPlan->name . ' reading plan. You can now start your reading journey!');
+
+        // Redirect to the reading plan show page instead of directly to dashboard
+        return redirect()->route('reading-plans.show', $readingPlan)
+            ->with('success', 'You have joined the '.$readingPlan->name.' reading plan. You can now start your reading journey!');
     }
 
     /**
@@ -98,104 +119,152 @@ class ReadingPlanController extends Controller
     public function resetProgress(ReadingPlan $readingPlan)
     {
         $user = Auth::user();
-        
+
         // Check if user is in this plan
         $existingPlan = $user->readingPlans()
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
-            
-        if (!$existingPlan) {
+
+        if (! $existingPlan) {
             return redirect()->route('reading-plans.index')
                 ->with('error', 'You are not following this reading plan.');
         }
-        
+
         // Delete all reading progress for this user and plan
         $user->readingProgress()
             ->where('reading_plan_id', $readingPlan->id)
             ->delete();
-            
+
         // Reset the pivot data
         $user->readingPlans()->updateExistingPivot($readingPlan->id, [
             'current_day' => 1,
             'current_streak' => 0,
             'completion_rate' => 0,
-            'is_active' => true
+            'is_active' => true,
         ]);
-        
+
         return redirect()->route('dashboard')
             ->with('success', 'Your reading progress has been reset.');
     }
-    
+
     /**
      * Skip to a specific day in the reading plan.
      */
     public function skipToDay(Request $request, ReadingPlan $readingPlan)
     {
         $request->validate([
-            'day' => 'required|integer|min:1'
+            'day' => 'required|integer|min:1',
         ]);
-        
+
         $user = Auth::user();
         $day = $request->input('day');
-        
+
         // Check if user is in this plan
         $existingPlan = $user->readingPlans()
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
-            
-        if (!$existingPlan) {
+
+        if (! $existingPlan) {
             return redirect()->route('reading-plans.index')
                 ->with('error', 'You are not following this reading plan.');
         }
-        
+
         // Check if the day is valid
         $maxDay = $readingPlan->dailyReadings()->max('day_number');
         if ($day > $maxDay) {
             return back()->with('error', "The reading plan only has {$maxDay} days.");
         }
-        
+
         // Update the current day
         $user->readingPlans()->updateExistingPivot($readingPlan->id, [
-            'current_day' => $day
+            'current_day' => $day,
         ]);
-        
+
         // Recalculate completion rate
         $completedDays = $user->readingProgress()
             ->where('reading_plan_id', $readingPlan->id)
             ->count();
-            
+
         $completionRate = ($completedDays / $day) * 100;
-        
+
         $user->readingPlans()->updateExistingPivot($readingPlan->id, [
-            'completion_rate' => $completionRate
+            'completion_rate' => $completionRate,
         ]);
-        
+
         return redirect()->route('dashboard')
             ->with('success', "You've skipped to day {$day} of the reading plan.");
     }
+
+    /**
+     * View all reading progress for a plan.
+     */
+    public function viewProgress(ReadingPlan $readingPlan)
+    {
+        $user = Auth::user();
+
+        $existingPlan = $user->readingPlans()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->first();
+
+        if (! $existingPlan) {
+            return redirect()->route('reading-plans.index')
+                ->with('error', 'You are not following this reading plan.');
+        }
+
+        $dailyReadings = $readingPlan->dailyReadings()
+            ->orderBy('day_number')
+            ->get();
+
+        $progress = [];
+        foreach ($dailyReadings as $reading) {
+            $completed = $user->readingProgress()
+                ->where('daily_reading_id', $reading->id)
+                ->first();
+
+            $progress[] = [
+                'day' => $reading->day_number,
+                'reading' => $reading->reading_range,
+                'is_break_day' => $reading->is_break_day,
+                'completed' => $completed !== null,
+                'completed_date' => $completed ? $completed->completed_date : null,
+            ];
+        }
+
+        return view('reading-plans.progress', compact('readingPlan', 'progress'));
+    }
+
     /**
      * Leave a reading plan.
      */
     public function leave(ReadingPlan $readingPlan)
     {
         $user = Auth::user();
-        
+
         // Check if user is in this plan
         $existingPlan = $user->readingPlans()
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
-            
-        if (!$existingPlan) {
+
+        if (! $existingPlan) {
             return redirect()->route('reading-plans.index')
                 ->with('error', 'You are not participating in this reading plan.');
         }
-        
+
         // Just mark as inactive instead of detaching to preserve history
         $user->readingPlans()->updateExistingPivot($readingPlan->id, [
-            'is_active' => false
+            'is_active' => false,
         ]);
-        
+
         return redirect()->route('reading-plans.index')
-            ->with('success', 'You have left the ' . $readingPlan->name . ' reading plan.');
+            ->with('success', 'You have left the '.$readingPlan->name.' reading plan.');
+    }
+
+    private function getPlanAvailability(User $user, ReadingPlan $readingPlan): array
+    {
+        if ($readingPlan->isOldTestament() && ! $user->hasCompletedPlanType(ReadingPlan::TYPE_NEW_TESTAMENT)) {
+            return [false, 'Old Testament plans unlock after you complete a New Testament plan.'];
+        }
+
+        return [true, null];
     }
 }

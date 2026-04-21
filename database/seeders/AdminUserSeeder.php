@@ -13,13 +13,16 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::create([
-            'name' => 'Admin User',
-            'phone_number' => '07034531814',
-            'email' => 'admin@example.com',
-            'role' => 'admin',
-            'password' => Hash::make('password'), // Change this to a secure password
-        ]);
+        User::updateOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'phone_number' => '07034531814',
+                'role' => 'admin',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
 
         $this->command->info('Admin user created with email: admin@example.com');
     }

@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-use App\Models\BibleChapter;
 use App\Models\DailyReading;
-use Illuminate\Http\Request;
 use App\Models\ReadingProgress;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReadingProgressController extends Controller
@@ -20,16 +19,13 @@ class ReadingProgressController extends Controller
             ->where('user_reading_plans.is_active', true)
             ->first();
 
-        if (!$activePlan) {
+        if (! $activePlan) {
             return redirect()->route('reading-plans.index')
                 ->with('error', 'No active reading plan found. Please join a reading plan first.');
         }
 
-        // Calculate the current day based on plan start date
-        $startDate = Carbon::parse($activePlan->start_date);
-        $today = Carbon::today();
-        $daysSinceStart = $startDate->diffInDays($today, false);
-        $calculatedCurrentDay = $daysSinceStart < 0 ? 1 : $daysSinceStart + 1;
+        // Calculate the current day based on the actual reading start date.
+        $calculatedCurrentDay = $activePlan->expectedCurrentDay(Carbon::today());
 
         // Clamp to max day in the plan
         $maxDay = DailyReading::where('reading_plan_id', $activePlan->id)->max('day_number');
@@ -53,61 +49,67 @@ class ReadingProgressController extends Controller
 
         // All user's reading plans for the summary grid
         $readingPlans = $user->readingPlans()->get();
+        $trainingResources = $activePlan->trainingResources()->get();
+        $trainingComplete = $activePlan->isTrainingCompleteFor($user);
+        $readingUnlocked = $activePlan->canRecordReadings($user, Carbon::today());
 
         return view('reading-progress.index', [
             'readingPlan' => $activePlan,
             'todayReading' => $todayReading,
             'readingPlans' => $readingPlans,
+            'trainingResources' => $trainingResources,
+            'trainingComplete' => $trainingComplete,
+            'readingUnlocked' => $readingUnlocked,
         ]);
     }
 
-    public function view($request)
-{
-    /*
-    $user = auth()->user();
-    
-    $newTestamentProgress = [
-        'current_day' => ReadingProgress::getNextDay($user->id, 'new'),
-        'total_days' => BibleChapter::getTotalDays('new'),
-        'completion_rate' => $this->calculateCompletionRate($user->id, 'new'),
-        'today_chapters' => $this->getTodayChapters($user->id, 'new'),
-        'history' => ReadingProgress::where('user_id', $user->id)
-            ->where('testament', 'new')
-            ->orderBy('day_number', 'desc')
-            ->get()
-    ];
-    
-    $oldTestamentProgress = [
-        'current_day' => ReadingProgress::getNextDay($user->id, 'old'),
-        'total_days' => BibleChapter::getTotalDays('old'),
-        'completion_rate' => $this->calculateCompletionRate($user->id, 'old'),
-        'today_chapters' => $this->getTodayChapters($user->id, 'old'),
-        'history' => ReadingProgress::where('user_id', $user->id)
-            ->where('testament', 'old')
-            ->orderBy('day_number', 'desc')
-            ->get()
-    ];
+    public function view(Request $request)
+    {
+        /*
+        $user = auth()->user();
 
-    return view('reading.view', compact('newTestamentProgress', 'oldTestamentProgress'));
-    */
+        $newTestamentProgress = [
+            'current_day' => ReadingProgress::getNextDay($user->id, 'new'),
+            'total_days' => BibleChapter::getTotalDays('new'),
+            'completion_rate' => $this->calculateCompletionRate($user->id, 'new'),
+            'today_chapters' => $this->getTodayChapters($user->id, 'new'),
+            'history' => ReadingProgress::where('user_id', $user->id)
+                ->where('testament', 'new')
+                ->orderBy('day_number', 'desc')
+                ->get()
+        ];
 
-    $planId = $request->query('plan_id');
-        
-        if (!$planId) {
+        $oldTestamentProgress = [
+            'current_day' => ReadingProgress::getNextDay($user->id, 'old'),
+            'total_days' => BibleChapter::getTotalDays('old'),
+            'completion_rate' => $this->calculateCompletionRate($user->id, 'old'),
+            'today_chapters' => $this->getTodayChapters($user->id, 'old'),
+            'history' => ReadingProgress::where('user_id', $user->id)
+                ->where('testament', 'old')
+                ->orderBy('day_number', 'desc')
+                ->get()
+        ];
+
+        return view('reading.view', compact('newTestamentProgress', 'oldTestamentProgress'));
+        */
+
+        $planId = $request->query('plan_id');
+
+        if (! $planId) {
             $user = Auth::user();
             $activePlan = $user->readingPlans()
                 ->where('user_reading_plans.is_active', true)
                 ->first();
-                
+
             if ($activePlan) {
                 $planId = $activePlan->id;
             }
         }
-        
+
         return view('reading-progress.view', [
-            'planId' => $planId
+            'planId' => $planId,
         ]);
-}
+    }
 
     public function quickMark(Request $request)
     {
@@ -124,11 +126,16 @@ class ReadingProgressController extends Controller
             ->where('user_reading_plans.is_active', true)
             ->first();
 
-        if (!$userPlan) {
+        if (! $userPlan) {
             return back()->with('error', 'No active reading plan found.');
         }
 
+        if (! $userPlan->canRecordReadings($user, Carbon::today())) {
+            return back()->with('error', 'Complete all training resources and wait for the reading start date before recording reading progress.');
+        }
+
         $currentDay = $userPlan->pivot->current_day;
+        $maxDay = (int) DailyReading::where('reading_plan_id', $userPlan->id)->max('day_number');
 
         // Build list of days to mark
         $daysToMark = [];
@@ -139,7 +146,7 @@ class ReadingProgressController extends Controller
             if ($start > $end) {
                 [$start, $end] = [$end, $start];
             }
-            $end = min($end, $currentDay);
+            $end = min($end, $maxDay);
             $start = max(1, $start);
             $daysToMark = range($start, $end);
         } elseif ($request->boolean('apply_catch_up') && $request->filled('day_number')) {
@@ -148,8 +155,8 @@ class ReadingProgressController extends Controller
             $daysToMark = range(1, $target);
         } elseif ($request->filled('day_number')) {
             $target = intval($request->day_number);
-            if ($target > $currentDay) {
-                return back()->with('error', 'Cannot mark future days as complete.');
+            if ($target > $maxDay) {
+                return back()->with('error', "This plan only has {$maxDay} day(s).");
             }
             $daysToMark = [$target];
         } else {
@@ -163,17 +170,32 @@ class ReadingProgressController extends Controller
             ->get()
             ->keyBy('day_number');
 
-        $already = 0; $breaks = 0; $created = 0; $notFound = 0;
+        $already = 0;
+        $breaks = 0;
+        $created = 0;
+        $notFound = 0;
 
         foreach ($daysToMark as $day) {
             $reading = $readings->get($day);
-            if (!$reading) { $notFound++; continue; }
-            if ($reading->is_break_day) { $breaks++; continue; }
-            
+            if (! $reading) {
+                $notFound++;
+
+                continue;
+            }
+            if ($reading->is_break_day) {
+                $breaks++;
+
+                continue;
+            }
+
             $exists = ReadingProgress::where('user_id', $user->id)
                 ->where('daily_reading_id', $reading->id)
                 ->exists();
-            if ($exists) { $already++; continue; }
+            if ($exists) {
+                $already++;
+
+                continue;
+            }
 
             ReadingProgress::create([
                 'user_id' => $user->id,
@@ -208,9 +230,17 @@ class ReadingProgressController extends Controller
         $streak = 0;
         for ($d = $currentDay; $d >= 1; $d--) {
             $day = $daysMap->get($d);
-            if (!$day) { break; }
-            if ($day->is_break_day) { continue; }
-            if (in_array($d, $completedDayNumbers)) { $streak++; } else { break; }
+            if (! $day) {
+                break;
+            }
+            if ($day->is_break_day) {
+                continue;
+            }
+            if (in_array($d, $completedDayNumbers)) {
+                $streak++;
+            } else {
+                break;
+            }
         }
 
         $user->readingPlans()->updateExistingPivot($userPlan->id, [
@@ -219,14 +249,20 @@ class ReadingProgressController extends Controller
         ]);
 
         $msgParts = [];
-        if ($created) $msgParts[] = "$created day(s) marked";
-        if ($already) $msgParts[] = "$already already completed";
-        if ($breaks) $msgParts[] = "$breaks break day(s) skipped";
-        if ($notFound) $msgParts[] = "$notFound not found";
+        if ($created) {
+            $msgParts[] = "$created day(s) marked";
+        }
+        if ($already) {
+            $msgParts[] = "$already already completed";
+        }
+        if ($breaks) {
+            $msgParts[] = "$breaks break day(s) skipped";
+        }
+        if ($notFound) {
+            $msgParts[] = "$notFound not found";
+        }
         $summary = implode(', ', $msgParts);
 
         return back()->with('success', $summary ?: 'No changes made.');
     }
-
-
 }

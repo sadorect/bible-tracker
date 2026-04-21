@@ -1,0 +1,212 @@
+<x-admin-layout>
+    <x-slot name="header">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Structure</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Build and manage the leadership hierarchy.</h1>
+        </div>
+    </x-slot>
+
+    <div class="space-y-6">
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total groups</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ $stats['total'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Squads</p>
+                <p class="mt-3 text-3xl font-semibold text-sky-700">{{ $stats['squads'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Platoons</p>
+                <p class="mt-3 text-3xl font-semibold text-emerald-700">{{ $stats['platoons'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Batches</p>
+                <p class="mt-3 text-3xl font-semibold text-amber-700">{{ $stats['batches'] }}</p>
+            </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Teams</p>
+                <p class="mt-3 text-3xl font-semibold text-violet-700">{{ $stats['teams'] }}</p>
+            </article>
+        </section>
+
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Create hierarchy</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Add a new structure level</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Create squads, platoons, batches, and teams here, then assign the matching leader directly.</p>
+                </div>
+
+                <form method="POST" action="{{ route('admin.hierarchies.store') }}" class="mt-6 space-y-5">
+                    @csrf
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Name</span>
+                        <input type="text" name="name" value="{{ old('name') }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('name')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Type</span>
+                            <select name="type" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Select type</option>
+                                @foreach($typeLabels as $value => $label)
+                                    <option value="{{ $value }}" {{ old('type') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('type')
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
+
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Leader</span>
+                            <select name="leader_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Select leader</option>
+                                @foreach($leaders as $leader)
+                                    <option value="{{ $leader->id }}" {{ (string) old('leader_id') === (string) $leader->id ? 'selected' : '' }}>
+                                        {{ $leader->name }} · {{ $leader->roleLabel() }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('leader_id')
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
+                    </div>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Parent group</span>
+                        <select name="parent_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">No parent</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}" {{ (string) old('parent_id') === (string) $hierarchy->id ? 'selected' : '' }}>
+                                    {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }} · {{ $displayPaths[$hierarchy->id] }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('parent_id')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        Create hierarchy
+                    </button>
+                </form>
+            </div>
+
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Recommended chain</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Leadership flow</h2>
+                </div>
+
+                <div class="mt-6 space-y-3">
+                    @foreach($typeLabels as $value => $label)
+                        <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4">
+                            <div class="flex items-center justify-between gap-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">{{ $label }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ $recommendedParents[$value] }}</p>
+                                </div>
+                                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                                    {{ $expectedLeaderLabels[$value] ?? 'Leader' }}
+                                </span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Existing structure</p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">Edit groups and leader assignments</h2>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-2">
+                @forelse($hierarchies as $hierarchy)
+                    <article class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-xl font-semibold text-slate-900">{{ $hierarchy->name }}</h3>
+                                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                                        {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }}
+                                    </span>
+                                </div>
+                                <p class="mt-2 text-sm text-slate-500">{{ $displayPaths[$hierarchy->id] }}</p>
+                            </div>
+                            <div class="text-sm text-slate-500">
+                                <p>{{ $hierarchy->children_count }} child group(s)</p>
+                                <p>{{ $hierarchy->members_count }} assigned user(s)</p>
+                            </div>
+                        </div>
+
+                        <form method="POST" action="{{ route('admin.hierarchies.update', $hierarchy) }}" class="mt-6 space-y-4">
+                            @csrf
+                            @method('PUT')
+
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">Name</span>
+                                <input type="text" name="name" value="{{ old('name', $hierarchy->name) }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            </label>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">Type</span>
+                                    <input type="text" value="{{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }}" disabled class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 shadow-sm">
+                                    <input type="hidden" name="type" value="{{ $hierarchy->type }}">
+                                </label>
+
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">Leader</span>
+                                    <select name="leader_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                        @foreach($leaders as $leader)
+                                            <option value="{{ $leader->id }}" {{ (int) old('leader_id', $hierarchy->leader_id) === $leader->id ? 'selected' : '' }}>
+                                                {{ $leader->name }} · {{ $leader->roleLabel() }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            </div>
+
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">Parent group</span>
+                                <select name="parent_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                    <option value="">No parent</option>
+                                    @foreach($hierarchies as $parentOption)
+                                        @if($parentOption->id !== $hierarchy->id)
+                                            <option value="{{ $parentOption->id }}" {{ (string) old('parent_id', $hierarchy->parent_id) === (string) $parentOption->id ? 'selected' : '' }}>
+                                                {{ $typeLabels[$parentOption->type] ?? ucfirst($parentOption->type) }} · {{ $displayPaths[$parentOption->id] }}
+                                            </option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </label>
+
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="text-xs text-slate-500">
+                                    Current leader: {{ $hierarchy->leader?->name ?? 'None assigned' }}
+                                </div>
+                                <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                    Save changes
+                                </button>
+                            </div>
+                        </form>
+                    </article>
+                @empty
+                    <div class="rounded-[2rem] border border-dashed border-slate-200 px-6 py-16 text-center text-sm text-slate-500 xl:col-span-2">
+                        No hierarchy groups have been created yet.
+                    </div>
+                @endforelse
+            </div>
+        </section>
+    </div>
+</x-admin-layout>

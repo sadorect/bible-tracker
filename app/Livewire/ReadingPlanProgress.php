@@ -11,14 +11,17 @@ use Livewire\Component;
 class ReadingPlanProgress extends Component
 {
     public $readingPlan;
+
     public $userPlan;
+
     public $readingProgress = [];
+
     public $statistics = [];
-    
+
     public function mount($planId = null)
     {
         $user = Auth::user();
-        
+
         if ($planId) {
             $this->readingPlan = ReadingPlan::find($planId);
             $this->userPlan = $user->readingPlans()
@@ -29,44 +32,45 @@ class ReadingPlanProgress extends Component
             $this->userPlan = $user->readingPlans()
                 ->where('user_reading_plans.is_active', true)
                 ->first();
-                
+
             if ($this->userPlan) {
                 $this->readingPlan = ReadingPlan::find($this->userPlan->id);
             } else {
                 return redirect()->route('reading-plans.index');
             }
         }
-        
+
         $this->loadReadingProgress();
         $this->calculateStatistics();
     }
-    
+
     public function loadReadingProgress()
     {
         $user = Auth::user();
-        
+        $planStartDate = Carbon::parse($this->readingPlan->reading_start_date ?? $this->readingPlan->start_date);
+
         // Get all daily readings for this plan
         $dailyReadings = $this->readingPlan->dailyReadings()
             ->orderBy('day_number')
             ->get();
-            
+
         foreach ($dailyReadings as $reading) {
             $completed = ReadingProgress::where('user_id', $user->id)
                 ->where('daily_reading_id', $reading->id)
                 ->first();
-                
+
             $this->readingProgress[] = [
                 'day' => $reading->day_number,
-                'date' => Carbon::parse($this->readingPlan->start_date)->addDays($reading->day_number - 1)->format('M d, Y'),
+                'date' => $planStartDate->copy()->addDays($reading->day_number - 1)->format('M d, Y'),
                 'reading' => $reading->reading_range,
                 'is_break_day' => $reading->is_break_day,
                 'completed' => $completed !== null,
                 'completed_date' => $completed ? $completed->completed_date : null,
-                'is_future' => Carbon::parse($this->readingPlan->start_date)->addDays($reading->day_number - 1)->isAfter(Carbon::today()),
+                'is_future' => $planStartDate->copy()->addDays($reading->day_number - 1)->isAfter(Carbon::today()),
             ];
         }
     }
-    
+
     public function calculateStatistics()
     {
         $totalDays = count($this->readingProgress);
@@ -74,7 +78,7 @@ class ReadingPlanProgress extends Component
         $missedDays = 0;
         $breakDays = 0;
         $futureDays = 0;
-        
+
         foreach ($this->readingProgress as $progress) {
             if ($progress['is_future']) {
                 $futureDays++;
@@ -86,10 +90,10 @@ class ReadingPlanProgress extends Component
                 $missedDays++;
             }
         }
-        
+
         $pastReadingDays = $totalDays - $futureDays - $breakDays;
         $completionRate = $pastReadingDays > 0 ? ($completedDays / $pastReadingDays) * 100 : 0;
-        
+
         $this->statistics = [
             'total_days' => $totalDays,
             'completed_days' => $completedDays,
@@ -100,7 +104,7 @@ class ReadingPlanProgress extends Component
             'current_streak' => $this->userPlan->pivot->current_streak ?? 0,
         ];
     }
-    
+
     public function render()
     {
         return view('livewire.reading-plan-progress', [

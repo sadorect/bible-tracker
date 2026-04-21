@@ -14,14 +14,43 @@
                         <p class="text-gray-600 mt-1">Track your reading progress through the plan.</p>
                     </div>
                     
-                    <div class="overflow-x-auto">
+                    <div
+                        class="overflow-x-auto"
+                        data-table-columns="legacy-reading-plan-progress"
+                        data-default-columns='{"completed-date":false}'
+                        data-default-columns-md='{"completed-date":true}'
+                    >
+                        <div class="mb-4 flex justify-end">
+                            <details class="relative">
+                                <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-gray-300 hover:text-gray-900">
+                                    <i class="fas fa-table-columns text-gray-400"></i>
+                                    Display columns
+                                    <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+                                </summary>
+                                <div class="absolute right-0 z-10 mt-3 w-72 rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Progress table</p>
+                                    <p class="mt-2 text-sm text-gray-500">Choose whether completed dates stay visible on this device.</p>
+                                    <div class="mt-4 grid gap-3">
+                                        <label class="flex items-center gap-3 text-sm text-gray-700">
+                                            <input type="checkbox" data-column-toggle="completed-date" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                            Completed date
+                                        </label>
+                                    </div>
+                                    <button type="button" data-table-columns-reset class="mt-4 inline-flex items-center rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-white hover:text-gray-900">
+                                        Reset compact defaults
+                                    </button>
+                                </div>
+                            </details>
+                        </div>
+
+                        <div data-table-columns-root>
                         <table class="min-w-full bg-white">
                             <thead>
                                 <tr>
                                     <th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Day</th>
                                     <th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Reading</th>
                                     <th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
-                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Completed Date</th>
+                                    <th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider" data-column="completed-date">Completed Date</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
@@ -38,13 +67,14 @@
                                                 <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Not Completed</span>
                                             @endif
                                         </td>
-                                        <td class="py-4 px-4 text-sm">
+                                        <td class="py-4 px-4 text-sm" data-column="completed-date">
                                             {{ $day['completed_date'] ? \Carbon\Carbon::parse($day['completed_date'])->format('M d, Y') : '-' }}
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
+                        </div>
                     </div>
                     
                     <div class="mt-8">

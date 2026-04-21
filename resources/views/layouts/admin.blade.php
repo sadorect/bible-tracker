@@ -5,160 +5,281 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Laravel') }} - Admin</title>
+    <title>{{ config('app.name', 'Bible Reading Tracker') }} · Admin</title>
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 
-    <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>[x-cloak]{display:none !important;}</style>
 </head>
-<body class="font-sans antialiased">
-    <div class="min-h-screen bg-gray-100">
-        <!-- Navigation -->
-        <nav class="bg-white border-b border-gray-100">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex">
-                        <!-- Logo -->
-                        <div class="shrink-0 flex items-center">
-                            <a href="{{ route('admin.dashboard') }}">
-                                <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
-                            </a>
-                        </div>
+@php($user = auth()->user())
+<body
+    class="bg-slate-100 font-['Instrument_Sans'] text-slate-900 antialiased"
+    x-data="{
+        sidebarOpen: false,
+        sidebarCollapsed: JSON.parse(localStorage.getItem('admin-sidebar-collapsed') ?? 'false'),
+        toggleSidebarCollapse() {
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(this.sidebarCollapsed));
+        },
+    }"
+>
+    <div class="min-h-screen">
+        <div x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"></div>
 
-                        <!-- Navigation Links -->
-                        <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                            <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                                {{ __('Dashboard') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('admin.reading-plans.index')" :active="request()->routeIs('admin.reading-plans.*')">
-                                {{ __('Reading Plans') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
-                                {{ __('Users') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('admin.progress.index')" :active="request()->routeIs('admin.progress.*')">
-                                {{ __('Progress Reports') }}
-                            </x-nav-link>
-                        </div>
+        <aside
+            :class="[
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+                sidebarCollapsed ? 'lg:w-24' : 'lg:w-72',
+            ]"
+            class="fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col border-r border-slate-200 bg-slate-950 text-slate-100 shadow-2xl shadow-slate-950/20 transition-all duration-300 ease-out"
+        >
+            <div class="flex h-20 items-center justify-between border-b border-white/10 px-6">
+                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3">
+                    <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                        <i class="fas fa-shield-halved text-sm"></i>
+                    </span>
+                    <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>
+                        <span class="block text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">Operations</span>
+                        <span class="block text-lg font-semibold text-white">Admin Console</span>
+                    </span>
+                </a>
+
+                <div class="flex items-center gap-2">
+                    <button @click="toggleSidebarCollapse()" class="hidden rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white lg:inline-flex" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                        <i class="fas" :class="sidebarCollapsed ? 'fa-angles-right' : 'fa-angles-left'"></i>
+                    </button>
+                    <button @click="sidebarOpen = false" class="rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white lg:hidden">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-1 flex-col overflow-y-auto px-4 py-6">
+                <div class="space-y-8">
+                    <div x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms class="rounded-[1.75rem] border border-white/10 bg-white/5 px-5 py-5">
+                        <p class="text-xs uppercase tracking-[0.24em] text-slate-400">Signed in as</p>
+                        <p class="mt-3 text-lg font-semibold text-white">{{ $user->name }}</p>
+                        <p class="mt-1 text-sm text-slate-400">{{ $user->email }}</p>
                     </div>
 
-                    <!-- Settings Dropdown -->
-                    <div class="hidden sm:flex sm:items-center sm:ml-6">
-                        <x-dropdown align="right" width="48">
-                            <x-slot name="trigger">
-                                <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                                    <div>{{ Auth::user()->name }}</div>
+                    <nav class="space-y-1.5">
+                        <a href="{{ route('admin.dashboard') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.dashboard') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-chart-pie w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Dashboard</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Home</span>
+                        </a>
+                        <a href="{{ route('admin.reading-plans.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.reading-plans.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-book-open-reader w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Reading Plans</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Plans</span>
+                        </a>
+                        <a href="{{ route('admin.users.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.users.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-users w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Users</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Users</span>
+                        </a>
+                        <a href="{{ route('admin.hierarchies.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.index') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-sitemap w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Hierarchies</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Groups</span>
+                        </a>
+                        <a href="{{ route('admin.hierarchies.tree') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.tree') || request()->routeIs('admin.hierarchies.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
+                            <i class="fas fa-diagram-project w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Tree view</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Tree</span>
+                        </a>
+                        <a href="{{ route('admin.progress.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.progress.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-chart-line w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Progress Reports</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Reports</span>
+                        </a>
+                    </nav>
+                </div>
 
-                                    <div class="ml-1">
-                                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </div>
-                                </button>
-                            </x-slot>
+                <div class="mt-8 rounded-[1.75rem] border border-emerald-400/20 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-100" x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>
+                    <p class="font-semibold text-white">Mission snapshot</p>
+                    <p class="mt-2 leading-6">Guide cohorts through training, custom reading cadences, and refresh breaks while giving leaders clear visibility down the chain.</p>
+                </div>
+            </div>
+        </aside>
 
-                            <x-slot name="content">
-                                <x-dropdown-link :href="route('dashboard')">
-                                    {{ __('User Dashboard') }}
-                                </x-dropdown-link>
-                                <x-dropdown-link :href="route('profile.edit')">
-                                    {{ __('Profile') }}
-                                </x-dropdown-link>
-
-                                <!-- Authentication -->
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-
-                                    <x-dropdown-link :href="route('logout')"
-                                            onclick="event.preventDefault();
-                                                        this.closest('form').submit();">
-                                        {{ __('Log Out') }}
-                                    </x-dropdown-link>
-                                </form>
-                            </x-slot>
-                        </x-dropdown>
-                    </div>
-
-                    <!-- Hamburger -->
-                    <div class="-mr-2 flex items-center sm:hidden">
-                        <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500 transition duration-150 ease-in-out">
-                            <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                                <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                                <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+        <div :class="sidebarCollapsed ? 'lg:pl-24' : 'lg:pl-72'" class="transition-all duration-300 ease-out">
+            <header class="sticky top-0 z-30 border-b border-slate-200 bg-slate-100/90 backdrop-blur">
+                <div class="mx-auto flex min-h-20 w-full max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <button @click="sidebarOpen = true" class="flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 lg:hidden">
+                            <i class="fas fa-bars"></i>
                         </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Responsive Navigation Menu -->
-            <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
-                <div class="pt-2 pb-3 space-y-1">
-                    <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                        {{ __('Dashboard') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.reading-plans.index')" :active="request()->routeIs('admin.reading-plans.*')">
-                        {{ __('Reading Plans') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
-                        {{ __('Users') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('admin.progress.index')" :active="request()->routeIs('admin.progress.*')">
-                        {{ __('Progress Reports') }}
-                    </x-responsive-nav-link>
-                </div>
-
-                <!-- Responsive Settings Options -->
-                <div class="pt-4 pb-1 border-t border-gray-200">
-                    <div class="px-4">
-                        <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                        <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
+                        <button @click="toggleSidebarCollapse()" class="hidden flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 lg:inline-flex" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                            <i class="fas" :class="sidebarCollapsed ? 'fa-angles-right' : 'fa-angles-left'"></i>
+                        </button>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">Command Center</p>
+                            @isset($header)
+                                <div class="mt-1 min-w-0 text-slate-900">{{ $header }}</div>
+                            @else
+                                <h1 class="text-lg font-semibold text-slate-900">Coordinate the reading movement.</h1>
+                            @endisset
+                        </div>
                     </div>
 
-                    <div class="mt-3 space-y-1">
-                        <x-responsive-nav-link :href="route('dashboard')">
-                            {{ __('User Dashboard') }}
-                        </x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
-                        </x-responsive-nav-link>
+                    <div class="flex items-center gap-3">
+                        <a href="{{ route('dashboard') }}" class="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex">
+                            User dashboard
+                        </a>
 
-                        <!-- Authentication -->
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-slate-300">
+                                <img class="h-10 w-10 rounded-2xl object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=020617&color=fff" alt="User avatar">
+                                <div class="hidden text-left sm:block">
+                                    <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
+                                    <p class="text-xs text-slate-500">Administrator</p>
+                                </div>
+                                <i class="fas fa-chevron-down text-xs text-slate-400"></i>
+                            </button>
 
-                            <x-responsive-nav-link :href="route('logout')"
-                                    onclick="event.preventDefault();
-                                                this.closest('form').submit();">
-                                {{ __('Log Out') }}
-                            </x-responsive-nav-link>
-                        </form>
+                            <div x-cloak x-show="open" @click.outside="open = false" x-transition class="absolute right-0 mt-3 w-56 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
+                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                                    <i class="fas fa-user-gear w-4 text-center text-slate-400"></i>
+                                    Profile settings
+                                </a>
+                                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                                    <i class="fas fa-house w-4 text-center text-slate-400"></i>
+                                    Member dashboard
+                                </a>
+                                <form method="POST" action="{{ route('logout') }}" class="border-t border-slate-200">
+                                    @csrf
+                                    <button type="submit" class="flex w-full items-center gap-3 px-4 py-3 text-sm text-rose-600 transition hover:bg-rose-50">
+                                        <i class="fas fa-right-from-bracket w-4 text-center"></i>
+                                        Sign out
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </nav>
+            </header>
 
-        <!-- Page Content -->
-        <main>
-            <!-- Flash Messages -->
-            @if (session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mx-4 mt-4" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                </div>
-            @endif
+            <main class="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+                @if(session('success'))
+                    <div class="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-sm shadow-emerald-900/5">
+                        {{ session('success') }}
+                    </div>
+                @endif
 
-            @if (session('error'))
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mx-4 mt-4" role="alert">
-                    <span class="block sm:inline">{{ session('error') }}</span>
-                </div>
-            @endif
+                @if(session('error'))
+                    <div class="mb-6 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
+                        {{ session('error') }}
+                    </div>
+                @endif
 
-            {{ $slot }}
-        </main>
+                {{ $slot }}
+            </main>
+        </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const parseColumnConfig = (value) => {
+                if (! value) {
+                    return {};
+                }
+
+                try {
+                    return JSON.parse(value);
+                } catch (error) {
+                    return {};
+                }
+            };
+
+            document.querySelectorAll('[data-table-columns]').forEach((panel) => {
+                const storageKey = `table-columns:${panel.dataset.tableColumns}`;
+                const toggleInputs = Array.from(panel.querySelectorAll('[data-column-toggle]'));
+
+                if (toggleInputs.length === 0) {
+                    return;
+                }
+
+                const columnKeys = toggleInputs.map((input) => input.dataset.columnToggle);
+                const tableRoot = panel.querySelector('[data-table-columns-root]') ?? panel;
+
+                const defaultSettings = () => {
+                    const settings = {};
+
+                    [
+                        panel.dataset.defaultColumns,
+                        window.innerWidth >= 768 ? panel.dataset.defaultColumnsMd : null,
+                        window.innerWidth >= 1024 ? panel.dataset.defaultColumnsLg : null,
+                        window.innerWidth >= 1280 ? panel.dataset.defaultColumnsXl : null,
+                    ].forEach((config) => Object.assign(settings, parseColumnConfig(config)));
+
+                    columnKeys.forEach((key) => {
+                        if (! Object.prototype.hasOwnProperty.call(settings, key)) {
+                            settings[key] = true;
+                        }
+                    });
+
+                    return settings;
+                };
+
+                const loadSettings = () => {
+                    const defaults = defaultSettings();
+                    const saved = localStorage.getItem(storageKey);
+
+                    if (! saved) {
+                        return defaults;
+                    }
+
+                    try {
+                        return { ...defaults, ...JSON.parse(saved) };
+                    } catch (error) {
+                        return defaults;
+                    }
+                };
+
+                const persistSettings = (settings) => {
+                    localStorage.setItem(storageKey, JSON.stringify(settings));
+                };
+
+                const applySettings = (settings) => {
+                    columnKeys.forEach((key) => {
+                        tableRoot.querySelectorAll(`[data-column="${key}"]`).forEach((element) => {
+                            element.classList.toggle('hidden', ! settings[key]);
+                        });
+                    });
+                };
+
+                const syncInputs = (settings) => {
+                    toggleInputs.forEach((input) => {
+                        input.checked = Boolean(settings[input.dataset.columnToggle]);
+                    });
+                };
+
+                let settings = loadSettings();
+                applySettings(settings);
+                syncInputs(settings);
+
+                toggleInputs.forEach((input) => {
+                    input.addEventListener('change', () => {
+                        settings[input.dataset.columnToggle] = input.checked;
+                        persistSettings(settings);
+                        applySettings(settings);
+                    });
+                });
+
+                panel.querySelector('[data-table-columns-reset]')?.addEventListener('click', () => {
+                    settings = defaultSettings();
+                    persistSettings(settings);
+                    applySettings(settings);
+                    syncInputs(settings);
+                });
+            });
+        });
+    </script>
 
     @stack('scripts')
 </body>

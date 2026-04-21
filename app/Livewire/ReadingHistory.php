@@ -2,8 +2,9 @@
 
 namespace App\Livewire;
 
-use App\Models\ReadingProgress;
+use App\Models\DailyReading;
 use App\Models\ReadingPlan;
+use App\Models\ReadingProgress;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -11,8 +12,11 @@ use Livewire\Component;
 class ReadingHistory extends Component
 {
     public $readingHistory = [];
+
     public $filterCompleted = 'all'; // 'all', 'completed', 'missed'
+
     public $searchTerm = '';
+
     public $userPlan;
 
     public function mount()
@@ -34,7 +38,7 @@ class ReadingHistory extends Component
     protected function loadUserPlan()
     {
         $user = Auth::user();
-        
+
         // Get user's active reading plan
         $this->userPlan = $user->readingPlans()
             ->where('user_reading_plans.is_active', true)
@@ -43,8 +47,9 @@ class ReadingHistory extends Component
 
     public function loadReadingHistory()
     {
-        if (!$this->userPlan) {
+        if (! $this->userPlan) {
             $this->readingHistory = [];
+
             return;
         }
 
@@ -53,16 +58,16 @@ class ReadingHistory extends Component
         // Get all daily readings for the user's active plan up to current day
         $currentDay = $this->userPlan->pivot ? $this->userPlan->pivot->current_day : 0;
 
-        $query = \App\Models\DailyReading::where('reading_plan_id', $this->userPlan->id)
+        $query = DailyReading::where('reading_plan_id', $this->userPlan->id)
             ->where('day_number', '<=', $currentDay)
             ->orderBy('day_number', 'desc');
 
         // Apply search filter
         if ($this->searchTerm) {
-            $query->where(function($q) {
-                $q->where('reading_range', 'like', '%' . $this->searchTerm . '%')
-                  ->orWhere('book_start', 'like', '%' . $this->searchTerm . '%')
-                  ->orWhere('book_end', 'like', '%' . $this->searchTerm . '%');
+            $query->where(function ($q) {
+                $q->where('reading_range', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('book_start', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('book_end', 'like', '%'.$this->searchTerm.'%');
             });
         }
 
@@ -70,7 +75,7 @@ class ReadingHistory extends Component
 
         // Get the reading plan to access the start date
         $readingPlan = ReadingPlan::find($this->userPlan->id);
-        $planStartDate = Carbon::parse($readingPlan->start_date);
+        $planStartDate = Carbon::parse($readingPlan->reading_start_date ?? $readingPlan->start_date);
 
         // Get all completed readings for this user and plan
         $completedReadings = ReadingProgress::where('user_id', $user->id)
@@ -78,12 +83,12 @@ class ReadingHistory extends Component
             ->get()
             ->keyBy('daily_reading_id');
 
-        $this->readingHistory = $dailyReadings->map(function ($reading) use ($user, $completedReadings, $planStartDate) {
+        $this->readingHistory = $dailyReadings->map(function ($reading) use ($completedReadings, $planStartDate) {
             $progress = $completedReadings->get($reading->id);
             $completed = $progress !== null;
-            
+
             // Filter based on completion status
-            if ($this->filterCompleted === 'completed' && !$completed) {
+            if ($this->filterCompleted === 'completed' && ! $completed) {
                 return null;
             }
             if ($this->filterCompleted === 'missed' && ($completed || $reading->is_break_day)) {
@@ -110,7 +115,7 @@ class ReadingHistory extends Component
     public function render()
     {
         // Check if we need to redirect to reading plans if no active plan
-        if (!$this->userPlan) {
+        if (! $this->userPlan) {
             return redirect()->route('reading-plans.index');
         }
 

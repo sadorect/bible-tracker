@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\BibleChapter;
+use Illuminate\Database\Seeder;
 
 class BibleChapterSeeder extends Seeder
 {
@@ -76,33 +76,41 @@ class BibleChapterSeeder extends Seeder
         '2 John' => 1,
         '3 John' => 1,
         'Jude' => 1,
-        'Revelation' => 22
+        'Revelation' => 22,
     ];
 
     public function run()
     {
-        // New Testament (9 chapters per day)
-        // 260 chapters ÷ 9 = 29 days
-        $this->seedTestament($this->newTestament, 'new', 9);
-        
-        // Old Testament (8 chapters per day)
-        // 929 chapters ÷ 8 = 117 days
-        $this->seedTestament($this->oldTestament, 'old', 8);
+        $rows = array_merge(
+            $this->buildRows($this->newTestament, 'new', 9),
+            $this->buildRows($this->oldTestament, 'old', 8),
+        );
+
+        foreach (array_chunk($rows, 250) as $chunk) {
+            BibleChapter::upsert(
+                $chunk,
+                ['book_name', 'chapter_number', 'testament'],
+                ['day_number']
+            );
+        }
     }
 
-    private function seedTestament($books, $testament, $chaptersPerDay)
+    private function buildRows(array $books, string $testament, int $chaptersPerDay): array
     {
         $dayNumber = 1;
+        $rows = [];
 
         foreach ($books as $book => $chapters) {
             for ($chapter = 1; $chapter <= $chapters; $chapter++) {
-                BibleChapter::create([
+                $rows[] = [
                     'book_name' => $book,
                     'chapter_number' => $chapter,
-                    'day_number' => ceil($dayNumber++ / $chaptersPerDay),
-                    'testament' => $testament
-                ]);
+                    'testament' => $testament,
+                    'day_number' => (int) ceil($dayNumber++ / $chaptersPerDay),
+                ];
             }
         }
+
+        return $rows;
     }
 }
