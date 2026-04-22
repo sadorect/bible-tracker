@@ -57,28 +57,7 @@ class ProgressReportScope
 
     public function accessibleUsersQuery(User $actor): Builder
     {
-        $query = User::query()->with(['hierarchy.parent']);
-
-        if ($this->isGlobal($actor)) {
-            return $query;
-        }
-
-        $hierarchyIds = $this->accessibleHierarchyIds($actor) ?? collect();
-
-        if ($hierarchyIds->isEmpty()) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        $leaderIds = Hierarchy::query()
-            ->whereIn('id', $hierarchyIds)
-            ->pluck('leader_id')
-            ->filter()
-            ->values();
-
-        return $query->where(function (Builder $scoped) use ($hierarchyIds, $leaderIds) {
-            $scoped->whereIn('hierarchy_id', $hierarchyIds)
-                ->orWhereIn('id', $leaderIds);
-        });
+        return $this->scopedUsersQuery($actor)->with(['hierarchy.parent']);
     }
 
     public function accessibleUsers(User $actor): Collection
@@ -88,13 +67,25 @@ class ProgressReportScope
             ->get();
     }
 
+    public function accessibleUserIds(User $actor): ?Collection
+    {
+        if ($this->isGlobal($actor)) {
+            return null;
+        }
+
+        return $this->scopedUsersQuery($actor)
+            ->select('users.id')
+            ->orderBy('users.id')
+            ->pluck('users.id');
+    }
+
     public function accessiblePlans(User $actor): Collection
     {
-        $userIds = $this->accessibleUsers($actor)->pluck('id');
-
         if ($this->isGlobal($actor)) {
             return ReadingPlan::query()->orderBy('name')->get();
         }
+
+        $userIds = $this->accessibleUserIds($actor) ?? collect();
 
         if ($userIds->isEmpty()) {
             return collect();
@@ -180,7 +171,7 @@ class ProgressReportScope
             return true;
         }
 
-        $userIds = $this->accessibleUsers($actor)->pluck('id');
+        $userIds = $this->accessibleUserIds($actor) ?? collect();
 
         if ($userIds->isEmpty()) {
             return false;
@@ -189,5 +180,31 @@ class ProgressReportScope
         return $plan->users()
             ->whereIn('users.id', $userIds)
             ->exists();
+    }
+
+    private function scopedUsersQuery(User $actor): Builder
+    {
+        $query = User::query();
+
+        if ($this->isGlobal($actor)) {
+            return $query;
+        }
+
+        $hierarchyIds = $this->accessibleHierarchyIds($actor) ?? collect();
+
+        if ($hierarchyIds->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $leaderIds = Hierarchy::query()
+            ->whereIn('id', $hierarchyIds)
+            ->pluck('leader_id')
+            ->filter()
+            ->values();
+
+        return $query->where(function (Builder $scoped) use ($hierarchyIds, $leaderIds) {
+            $scoped->whereIn('hierarchy_id', $hierarchyIds)
+                ->orWhereIn('id', $leaderIds);
+        });
     }
 }

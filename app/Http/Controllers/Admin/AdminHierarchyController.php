@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hierarchy;
 use App\Models\User;
 use App\Services\Auditing\AuditLogger;
+use App\Services\Hierarchy\HierarchyWorkflowService;
 use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class AdminHierarchyController extends Controller
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
+        private readonly HierarchyWorkflowService $workflowService,
     ) {
     }
 
@@ -114,14 +116,7 @@ class AdminHierarchyController extends Controller
             ->orderBy('name')
             ->get()
             ->groupBy('hierarchy_id');
-        $descendantTeams = $hierarchies->mapWithKeys(function (Hierarchy $hierarchy) {
-            return [
-                $hierarchy->id => Hierarchy::with(['parent'])
-                    ->whereIn('id', $hierarchy->descendantTeamsIncludingSelf()->pluck('id'))
-                    ->ordered()
-                    ->get(),
-            ];
-        });
+        $descendantTeams = $this->descendantTeamsByHierarchy($hierarchies);
         $teamBalanceInsights = $this->buildTeamBalanceInsights($hierarchies);
 
         $typeLabels = self::TYPE_LABELS;
@@ -142,19 +137,7 @@ class AdminHierarchyController extends Controller
 
         // Pre-compute display paths from the in-memory collection to avoid
         // O(n²) DB calls when nested loops render each hierarchy's path.
-        $idToName = $hierarchies->pluck('name', 'id');
-        $idToParent = $hierarchies->pluck('parent_id', 'id');
-        $displayPaths = $hierarchies->mapWithKeys(function ($h) use ($idToName, $idToParent) {
-            $segments = [];
-            $currentId = $h->id;
-            $visited = [];
-            while ($currentId && !in_array($currentId, $visited)) {
-                $visited[] = $currentId;
-                array_unshift($segments, $idToName[$currentId]);
-                $currentId = $idToParent[$currentId] ?? null;
-            }
-            return [$h->id => implode(' / ', $segments)];
-        });
+        $displayPaths = Hierarchy::buildDisplayPaths($hierarchies);
 
         return view('admin.hierarchies.index', compact(
             'hierarchies',
@@ -170,11 +153,246 @@ class AdminHierarchyController extends Controller
         ));
     }
 
+    private function descendantTeamsByHierarchy(Collection $hierarchies): Collection
+    {
+        $hierarchiesById = $hierarchies->keyBy('id');
+        $childrenByParentId = $hierarchies->groupBy('parent_id');
+        $teamIdsByHierarchyId = [];
+
+        $resolveTeamIds = function (int $hierarchyId) use (&$resolveTeamIds, &$teamIdsByHierarchyId, $childrenByParentId, $hierarchiesById): Collection {
+            if (array_key_exists($hierarchyId, $teamIdsByHierarchyId)) {
+                return $teamIdsByHierarchyId[$hierarchyId];
+            }
+
+            $hierarchy = $hierarchiesById->get($hierarchyId);
+            $teamIds = collect($hierarchy && $hierarchy->type === 'team' ? [$hierarchyId] : []);
+
+            foreach ($childrenByParentId->get($hierarchyId, collect()) as $child) {
+                $teamIds = $teamIds->merge($resolveTeamIds($child->id));
+            }
+
+            return $teamIdsByHierarchyId[$hierarchyId] = $teamIds->unique()->values();
+        };
+
+        return $hierarchies->mapWithKeys(function (Hierarchy $hierarchy) use ($hierarchies, $resolveTeamIds) {
+            $teamIds = $resolveTeamIds($hierarchy->id);
+
+            return [
+                $hierarchy->id => $hierarchies
+                    ->whereIn('id', $teamIds)
+                    ->where('type', 'team')
+                    ->values(),
+            ];
+        });
+    }
+
+    public function previewMigration(Request $request)
+    {
+        $validated = $request->validate([
+            'source_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+            'destination_parent_id' => ['required', 'exists:hierarchies,id'],
+        ]);
+
+        $source = Hierarchy::query()->findOrFail($validated['source_hierarchy_id']);
+        $destinationParent = Hierarchy::query()->findOrFail($validated['destination_parent_id']);
+        $preview = $this->workflowService->previewHorizontalMigration($source, $destinationParent);
+
+        return view('admin.hierarchies.workflows.migration-preview', [
+            'preview' => $preview,
+            'typeLabels' => self::TYPE_LABELS,
+        ]);
+    }
+
+    public function showVacancyResolution(Hierarchy $hierarchy)
+    {
+        $hierarchy->load(['parent.parent.parent.parent', 'members']);
+
+        return view('admin.hierarchies.resolve-vacancy', [
+            'hierarchy' => $hierarchy,
+            'typeLabels' => self::TYPE_LABELS,
+            'assignableLeaders' => $this->assignableLeadersForVacancy($hierarchy),
+            'promotableMembers' => $this->promotableMembersForVacancy($hierarchy),
+        ]);
+    }
+
+    public function resolveVacancy(Request $request, Hierarchy $hierarchy)
+    {
+        if ($hierarchy->leader_id) {
+            throw ValidationException::withMessages([
+                'leader_id' => "{$hierarchy->name} already has a leader assigned.",
+            ]);
+        }
+
+        $validated = $request->validate([
+            'resolution' => ['required', 'in:assign,promote'],
+            'leader_id' => ['nullable', 'exists:users,id'],
+            'promote_user_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $result = DB::transaction(function () use ($request, $hierarchy, $validated) {
+            if ($validated['resolution'] === 'assign') {
+                $leader = User::query()->findOrFail($validated['leader_id']);
+                $this->validateAssignableLeaderForVacancy($leader, $hierarchy);
+
+                $hierarchy->update([
+                    'leader_id' => $leader->id,
+                ]);
+
+                $leader->update([
+                    'hierarchy_id' => $hierarchy->id,
+                ]);
+
+                $this->auditLogger->log(
+                    'hierarchy.vacancy_resolved_by_assignment',
+                    $request->user(),
+                    $hierarchy->fresh('leader'),
+                    [
+                        'assigned_leader' => $leader->name,
+                        'hierarchy' => $hierarchy->displayPath(),
+                    ],
+                    "Assigned {$leader->name} to resolve the vacancy in {$hierarchy->name}.",
+                );
+
+                return "{$leader->name} is now leading {$hierarchy->name}.";
+            }
+
+            $candidate = User::query()->findOrFail($validated['promote_user_id']);
+
+            if ((int) $candidate->hierarchy_id !== $hierarchy->id) {
+                throw ValidationException::withMessages([
+                    'promote_user_id' => 'Choose someone already assigned to this hierarchy for direct promotion.',
+                ]);
+            }
+
+            if (Hierarchy::query()->where('leader_id', $candidate->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'promote_user_id' => "{$candidate->name} already leads another hierarchy.",
+                ]);
+            }
+
+            $candidate->update([
+                'role' => $this->expectedLeaderRoleForType($hierarchy->type),
+                'hierarchy_id' => $hierarchy->id,
+            ]);
+
+            $hierarchy->update([
+                'leader_id' => $candidate->id,
+            ]);
+
+            $this->auditLogger->log(
+                'hierarchy.vacancy_resolved_by_promotion',
+                $request->user(),
+                $hierarchy->fresh('leader'),
+                [
+                    'promoted_user' => $candidate->name,
+                    'new_role' => $candidate->role,
+                    'hierarchy' => $hierarchy->displayPath(),
+                ],
+                "Promoted {$candidate->name} to resolve the vacancy in {$hierarchy->name}.",
+            );
+
+            return "{$candidate->name} was promoted into {$hierarchy->name}.";
+        });
+
+        return redirect()->route('admin.hierarchies.show', $hierarchy)
+            ->with('success', $result);
+    }
+
+    public function executeMigration(Request $request)
+    {
+        $validated = $request->validate([
+            'source_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+            'destination_parent_id' => ['required', 'exists:hierarchies,id'],
+        ]);
+
+        $source = Hierarchy::query()->findOrFail($validated['source_hierarchy_id']);
+        $destinationParent = Hierarchy::query()->findOrFail($validated['destination_parent_id']);
+
+        $result = DB::transaction(fn () => $this->workflowService->executeHorizontalMigration($source, $destinationParent));
+
+        $this->auditLogger->log(
+            'hierarchy.branch_migrated',
+            $request->user(),
+            $result['source'],
+            [
+                'previous_parent' => $result['previous_parent']?->displayPath(),
+                'destination_parent' => $result['destination_parent']->displayPath(),
+                'previous_path' => $result['previous_path'],
+                'new_path' => $result['new_path'],
+                'branch_members' => $result['summary']['branch_members'],
+                'branch_leaders' => $result['summary']['branch_leaders'],
+                'descendant_groups' => $result['summary']['descendant_groups'],
+            ],
+            "Moved {$result['source']->name} under {$result['destination_parent']->name}.",
+        );
+
+        return redirect()->route('admin.hierarchies.index')
+            ->with('success', "{$result['source']->name} was moved under {$result['destination_parent']->name}.");
+    }
+
+    public function previewMerge(Request $request)
+    {
+        $validated = $request->validate([
+            'source_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+            'target_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+        ]);
+
+        $source = Hierarchy::query()->findOrFail($validated['source_hierarchy_id']);
+        $target = Hierarchy::query()->findOrFail($validated['target_hierarchy_id']);
+        $preview = $this->workflowService->previewSiblingMerge($source, $target);
+
+        return view('admin.hierarchies.workflows.merge-preview', [
+            'preview' => $preview,
+            'typeLabels' => self::TYPE_LABELS,
+        ]);
+    }
+
+    public function executeMerge(Request $request)
+    {
+        $validated = $request->validate([
+            'source_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+            'target_hierarchy_id' => ['required', 'exists:hierarchies,id'],
+            'merged_leader_id' => ['nullable', 'integer'],
+            'source_leader_disposition' => ['nullable', 'in:descendant_team,unassign'],
+            'source_leader_team_id' => ['nullable', 'integer'],
+            'target_leader_disposition' => ['nullable', 'in:descendant_team,unassign'],
+            'target_leader_team_id' => ['nullable', 'integer'],
+        ]);
+
+        $source = Hierarchy::query()->findOrFail($validated['source_hierarchy_id']);
+        $target = Hierarchy::query()->findOrFail($validated['target_hierarchy_id']);
+
+        $result = DB::transaction(fn () => $this->workflowService->executeSiblingMerge($source, $target, $validated));
+
+        $this->auditLogger->log(
+            'hierarchy.sibling_merged',
+            $request->user(),
+            $result['target'],
+            [
+                'source_name' => $result['source_name'],
+                'target_path' => $result['target']->displayPath(),
+                'merged_leader_id' => $result['merged_leader_id'],
+                'source_leader_disposition' => $result['source_leader_plan']['disposition'],
+                'source_leader_team_id' => $result['source_leader_plan']['team_id'],
+                'target_leader_disposition' => $result['target_leader_plan']['disposition'],
+                'target_leader_team_id' => $result['target_leader_plan']['team_id'],
+                'source_branch_members' => $result['summary']['source_branch_members'],
+                'source_descendant_groups' => $result['summary']['source_descendant_groups'],
+            ],
+            "Merged {$result['source_name']} into {$result['target']->name}.",
+        );
+
+        return redirect()->route('admin.hierarchies.index')
+            ->with('success', "{$result['source_name']} was merged into {$result['target']->name}.");
+    }
+
     public function store(Request $request)
     {
         [$validated, $leader] = $this->validateHierarchyData($request);
 
-        DB::transaction(function () use ($validated, $leader) {
+        $createdHierarchy = null;
+
+        DB::transaction(function () use ($validated, $leader, &$createdHierarchy) {
             $hierarchy = Hierarchy::create([
                 'name' => $validated['name'],
                 'type' => $validated['type'],
@@ -185,7 +403,23 @@ class AdminHierarchyController extends Controller
             $leader->update([
                 'hierarchy_id' => $hierarchy->id,
             ]);
+
+            $createdHierarchy = $hierarchy->fresh(['parent', 'leader']);
         });
+
+        if ($createdHierarchy) {
+            $this->auditLogger->log(
+                'hierarchy.created',
+                $request->user(),
+                $createdHierarchy,
+                [
+                    'type' => $createdHierarchy->type,
+                    'parent' => $createdHierarchy->parent?->displayPath(),
+                    'leader' => $createdHierarchy->leader?->name,
+                ],
+                "Created {$createdHierarchy->name}.",
+            );
+        }
 
         return redirect()->route('admin.hierarchies.index')
             ->with('success', 'Hierarchy created and leader assigned successfully.');
@@ -194,6 +428,11 @@ class AdminHierarchyController extends Controller
     public function update(Request $request, Hierarchy $hierarchy)
     {
         [$validated, $leader] = $this->validateHierarchyData($request, $hierarchy);
+        $previousState = [
+            'name' => $hierarchy->name,
+            'parent' => $hierarchy->parent?->displayPath(),
+            'leader' => $hierarchy->leader?->name,
+        ];
 
         DB::transaction(function () use ($validated, $leader, $hierarchy) {
             $previousLeader = $hierarchy->leader;
@@ -214,6 +453,22 @@ class AdminHierarchyController extends Controller
                 'hierarchy_id' => $hierarchy->id,
             ]);
         });
+
+        $hierarchy->refresh()->load(['parent', 'leader']);
+        $this->auditLogger->log(
+            'hierarchy.updated',
+            $request->user(),
+            $hierarchy,
+            [
+                'previous_name' => $previousState['name'],
+                'new_name' => $hierarchy->name,
+                'previous_parent' => $previousState['parent'],
+                'new_parent' => $hierarchy->parent?->displayPath(),
+                'previous_leader' => $previousState['leader'],
+                'new_leader' => $hierarchy->leader?->name,
+            ],
+            "Updated {$hierarchy->name}.",
+        );
 
         return redirect()->route('admin.hierarchies.index')
             ->with('success', "{$hierarchy->name} was updated successfully.");
@@ -390,6 +645,44 @@ class AdminHierarchyController extends Controller
             'batch' => User::ROLE_BATCH_LEADER,
             'team' => User::ROLE_TEAM_LEADER,
         };
+    }
+
+    private function assignableLeadersForVacancy(Hierarchy $hierarchy): Collection
+    {
+        return User::query()
+            ->where('role', $this->expectedLeaderRoleForType($hierarchy->type))
+            ->whereDoesntHave('systemRoles', fn ($query) => $query->where('slug', 'super_admin'))
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (User $user) => Hierarchy::query()->where('leader_id', $user->id)->exists())
+            ->values();
+    }
+
+    private function promotableMembersForVacancy(Hierarchy $hierarchy): Collection
+    {
+        return User::query()
+            ->where('hierarchy_id', $hierarchy->id)
+            ->where('role', '!=', User::ROLE_ADMIN)
+            ->whereDoesntHave('systemRoles', fn ($query) => $query->where('slug', 'super_admin'))
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (User $user) => Hierarchy::query()->where('leader_id', $user->id)->exists())
+            ->values();
+    }
+
+    private function validateAssignableLeaderForVacancy(User $leader, Hierarchy $hierarchy): void
+    {
+        if ($leader->role !== $this->expectedLeaderRoleForType($hierarchy->type)) {
+            throw ValidationException::withMessages([
+                'leader_id' => 'The selected leader does not match the hierarchy type.',
+            ]);
+        }
+
+        if (Hierarchy::query()->where('leader_id', $leader->id)->exists()) {
+            throw ValidationException::withMessages([
+                'leader_id' => "{$leader->name} already leads another hierarchy.",
+            ]);
+        }
     }
 
     private function isAllowedParentType(string $type, string $parentType): bool

@@ -4,19 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Bible Reading Tracker' }}</title>
-    
-    <!-- Tailwind CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <!-- Alpine.js -->
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-gray-50 font-inter" x-data="{ sidebarOpen: false }">
+<body class="bg-gray-50 font-sans" x-data="{ sidebarOpen: false }">
     <!-- Mobile sidebar overlay -->
     <div 
         x-show="sidebarOpen" 
@@ -59,11 +51,7 @@
                     </button>
                     
                     <div class="flex items-center">
-                        <img 
-                            class="w-8 h-8 rounded-full" 
-                            src="https://ui-avatars.com/api/?name=User&background=3B82F6&color=fff" 
-                            alt="User"
-                        >
+                        <x-user-avatar name="User" class="h-8 w-8 rounded-full bg-blue-600 text-white text-xs" />
                     </div>
                 </div>
             </div>

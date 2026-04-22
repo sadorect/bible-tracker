@@ -31,8 +31,7 @@ class AdminUserController extends Controller
             $perPage = 15;
         }
 
-        $query = User::with(['readingPlans', 'readingProgress', 'hierarchy.parent'])
-            ->with(['systemRoles.permissions'])
+        $query = User::with(['hierarchy.parent'])
             ->withCount(['readingPlans', 'readingProgress']);
 
         // Search functionality
@@ -65,9 +64,23 @@ class AdminUserController extends Controller
             });
         }
 
+        if ($request->filled('hierarchy_id')) {
+            $query->where('hierarchy_id', $request->integer('hierarchy_id'));
+        }
+
         $users = $query->orderBy('created_at', 'desc')->paginate($perPage)->withQueryString();
-        $readingPlans = ReadingPlan::all();
+        $readingPlans = ReadingPlan::query()->orderBy('name')->get();
         $hierarchies = Hierarchy::with('parent')->ordered()->get();
+        $hierarchyDisplayPaths = Hierarchy::buildDisplayPaths($hierarchies);
+        $prefillTargetTeamIds = collect($request->input('target_team_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+        $prefillSourceTeam = $request->filled('source_team_id')
+            ? Hierarchy::query()->find($request->integer('source_team_id'))
+            : null;
+        $prefillSuggestedMoveCount = max($request->integer('suggested_move_count'), 0);
 
         // Get summary statistics
         $stats = [
@@ -77,8 +90,21 @@ class AdminUserController extends Controller
             'members' => User::where('role', User::ROLE_MEMBER)->count(),
             'roles' => User::roleOptions(),
         ];
+        $multipleLegacyAdmins = User::where('role', User::ROLE_ADMIN)->count() > 1;
 
-        return view('admin.users.index', compact('users', 'readingPlans', 'hierarchies', 'stats', 'perPage', 'allowedPerPage'));
+        return view('admin.users.index', compact(
+            'users',
+            'readingPlans',
+            'hierarchies',
+            'hierarchyDisplayPaths',
+            'stats',
+            'perPage',
+            'allowedPerPage',
+            'prefillTargetTeamIds',
+            'prefillSourceTeam',
+            'prefillSuggestedMoveCount',
+            'multipleLegacyAdmins',
+        ));
     }
 
     public function show(User $user)
@@ -142,8 +168,11 @@ class AdminUserController extends Controller
             : null;
 
         $this->validateHierarchyRoleAlignment($request->input('role'), $selectedHierarchy);
+        $this->guardAgainstOccupiedLeadershipAssignment(null, $request->input('role'), $selectedHierarchy);
 
-        DB::transaction(function () use ($request, $selectedHierarchy) {
+        $createdUser = null;
+
+        DB::transaction(function () use ($request, $selectedHierarchy, &$createdUser) {
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
@@ -168,7 +197,23 @@ class AdminUserController extends Controller
                     ]);
                 }
             }
+
+            $createdUser = $user->fresh(['hierarchy.parent', 'systemRoles']);
         });
+
+        if ($createdUser) {
+            $this->auditLogger->log(
+                'users.created',
+                $request->user(),
+                $createdUser,
+                [
+                    'role' => $createdUser->role,
+                    'hierarchy' => $createdUser->hierarchy?->displayPath(),
+                    'system_roles' => $createdUser->systemRoles->pluck('name')->all(),
+                ],
+                "Created {$createdUser->name}.",
+            );
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User created successfully.');
@@ -211,6 +256,14 @@ class AdminUserController extends Controller
         $this->validateHierarchyRoleAlignment($request->input('role'), $selectedHierarchy);
         $this->guardAgainstUnsafeLeadershipRemoval($user, $request->input('role'), $selectedHierarchy);
         $this->guardAgainstRemovingFinalLegacyAdmin($user, $request->input('role'));
+        $this->guardAgainstOccupiedLeadershipAssignment($user, $request->input('role'), $selectedHierarchy);
+
+        $originalState = [
+            'role' => $user->role,
+            'hierarchy' => $user->hierarchy?->displayPath(),
+            'message_delivery_preference' => $user->message_delivery_preference,
+            'system_roles' => $user->systemRoles()->pluck('system_roles.name')->all(),
+        ];
 
         DB::transaction(function () use ($request, $user, $selectedHierarchy) {
             $updateData = [
@@ -248,6 +301,24 @@ class AdminUserController extends Controller
             }
         });
 
+        $user->refresh()->load(['hierarchy.parent', 'systemRoles']);
+        $this->auditLogger->log(
+            'users.updated',
+            $request->user(),
+            $user,
+            [
+                'previous_role' => $originalState['role'],
+                'new_role' => $user->role,
+                'previous_hierarchy' => $originalState['hierarchy'],
+                'new_hierarchy' => $user->hierarchy?->displayPath(),
+                'previous_delivery_preference' => $originalState['message_delivery_preference'],
+                'new_delivery_preference' => $user->message_delivery_preference,
+                'previous_system_roles' => $originalState['system_roles'],
+                'new_system_roles' => $user->systemRoles->pluck('name')->all(),
+            ],
+            "Updated {$user->name}.",
+        );
+
         return redirect()->route('admin.users.index')
             ->with('success', 'User updated successfully.');
     }
@@ -260,7 +331,19 @@ class AdminUserController extends Controller
                 ->with('error', 'Cannot delete the last admin user.');
         }
 
+        $user->load('hierarchy.parent');
         $user->delete();
+
+        $this->auditLogger->log(
+            'users.deleted',
+            request()->user(),
+            $user,
+            [
+                'role' => $user->role,
+                'hierarchy' => $user->hierarchy?->displayPath(),
+            ],
+            "Deleted {$user->name}.",
+        );
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User deleted successfully.');
@@ -269,7 +352,7 @@ class AdminUserController extends Controller
     public function bulkAction(Request $request)
     {
         $request->validate([
-            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy,distribute_evenly'],
+            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy,distribute_evenly,promote_current_assignment,demote_from_leadership'],
             'user_ids' => ['required', 'array'],
             'user_ids.*' => ['exists:users,id'],
             'reading_plan_id' => ['required_if:action,assign_plan,remove_plan', 'exists:reading_plans,id'],
@@ -286,7 +369,18 @@ class AdminUserController extends Controller
 
         switch ($request->action) {
             case 'delete':
+                $deletedNames = $users->pluck('name')->all();
                 $users->each->delete();
+                $this->auditLogger->log(
+                    'users.bulk_deleted',
+                    $request->user(),
+                    null,
+                    [
+                        'count' => count($deletedNames),
+                        'users' => $deletedNames,
+                    ],
+                    'Deleted users from the directory bulk workflow.',
+                );
                 $message = 'Selected users deleted successfully.';
                 break;
 
@@ -299,6 +393,16 @@ class AdminUserController extends Controller
                         ],
                     ]);
                 }
+                $this->auditLogger->log(
+                    'users.plans_assigned',
+                    $request->user(),
+                    ReadingPlan::query()->find($request->reading_plan_id),
+                    [
+                        'count' => $users->count(),
+                        'users' => $users->pluck('name')->all(),
+                    ],
+                    'Assigned a reading plan through the directory bulk workflow.',
+                );
                 $message = 'Reading plan assigned to selected users.';
                 break;
 
@@ -306,14 +410,41 @@ class AdminUserController extends Controller
                 foreach ($users as $user) {
                     $user->readingPlans()->detach($request->reading_plan_id);
                 }
+                $this->auditLogger->log(
+                    'users.plans_removed',
+                    $request->user(),
+                    ReadingPlan::query()->find($request->reading_plan_id),
+                    [
+                        'count' => $users->count(),
+                        'users' => $users->pluck('name')->all(),
+                    ],
+                    'Removed a reading plan through the directory bulk workflow.',
+                );
                 $message = 'Reading plan removed from selected users.';
                 break;
 
             case 'change_role':
                 $users->each(function ($user) use ($request) {
+                    $selectedHierarchy = $user->hierarchy()->first();
+                    $this->validateHierarchyRoleAlignment($request->role, $selectedHierarchy);
+                    $this->guardAgainstUnsafeLeadershipRemoval($user, $request->role, $selectedHierarchy);
                     $this->guardAgainstRemovingFinalLegacyAdmin($user, $request->role);
+                    $this->guardAgainstOccupiedLeadershipAssignment($user, $request->role, $selectedHierarchy);
                     $user->update(['role' => $request->role]);
+                    $user->refresh();
+                    $this->syncLeadershipAssignment($user, $selectedHierarchy, $request->role);
                 });
+                $this->auditLogger->log(
+                    'users.roles_changed',
+                    $request->user(),
+                    null,
+                    [
+                        'new_role' => $request->role,
+                        'count' => $users->count(),
+                        'users' => $users->pluck('name')->all(),
+                    ],
+                    'Changed user roles through the directory bulk workflow.',
+                );
                 $message = 'Role updated for selected users.';
                 break;
 
@@ -322,6 +453,7 @@ class AdminUserController extends Controller
                     foreach ($users as $user) {
                         $this->validateHierarchyRoleAlignment($user->role, $selectedHierarchy);
                         $this->guardAgainstUnsafeLeadershipRemoval($user, $user->role, $selectedHierarchy);
+                        $this->guardAgainstOccupiedLeadershipAssignment($user, $user->role, $selectedHierarchy);
 
                         $user->update([
                             'hierarchy_id' => $selectedHierarchy?->id,
@@ -331,6 +463,16 @@ class AdminUserController extends Controller
                         $this->syncLeadershipAssignment($user, $selectedHierarchy, $user->role);
                     }
                 });
+                $this->auditLogger->log(
+                    'users.hierarchy_assigned',
+                    $request->user(),
+                    $selectedHierarchy,
+                    [
+                        'count' => $users->count(),
+                        'users' => $users->pluck('name')->all(),
+                    ],
+                    'Moved users into a hierarchy through the directory bulk workflow.',
+                );
                 $message = 'Selected users moved into the chosen group.';
                 break;
 
@@ -344,6 +486,16 @@ class AdminUserController extends Controller
                         ]);
                     }
                 });
+                $this->auditLogger->log(
+                    'users.hierarchy_cleared',
+                    $request->user(),
+                    null,
+                    [
+                        'count' => $users->count(),
+                        'users' => $users->pluck('name')->all(),
+                    ],
+                    'Cleared hierarchy assignments through the directory bulk workflow.',
+                );
                 $message = 'Group assignment cleared for selected users.';
                 break;
 
@@ -388,6 +540,26 @@ class AdminUserController extends Controller
                 });
 
                 $message = 'Selected members were distributed evenly across the chosen teams.';
+                break;
+
+            case 'promote_current_assignment':
+                DB::transaction(function () use ($users, $request) {
+                    foreach ($users as $user) {
+                        $this->promoteUserIntoCurrentAssignment($user, $request->user());
+                    }
+                });
+
+                $message = 'Selected users were promoted into the vacant leadership slots for their current assignments.';
+                break;
+
+            case 'demote_from_leadership':
+                DB::transaction(function () use ($users, $request) {
+                    foreach ($users as $user) {
+                        $this->demoteLeaderFromDirectory($user, $request->user());
+                    }
+                });
+
+                $message = 'Selected leaders were demoted safely through the directory workflow.';
                 break;
         }
 
@@ -508,6 +680,19 @@ class AdminUserController extends Controller
         ]);
     }
 
+    private function guardAgainstOccupiedLeadershipAssignment(?User $user, string $role, ?Hierarchy $hierarchy): void
+    {
+        if (! $hierarchy || ! in_array($role, User::leaderRoles(), true)) {
+            return;
+        }
+
+        if ($hierarchy->leader_id && $hierarchy->leader_id !== $user?->id) {
+            throw ValidationException::withMessages([
+                'hierarchy_id' => "Assign a replacement through the hierarchy workflow before placing another leader into {$hierarchy->name}.",
+            ]);
+        }
+    }
+
     private function guardAgainstUnsafeLeadershipRemoval(User $user, string $newRole, ?Hierarchy $newHierarchy): void
     {
         $currentLeadershipHierarchy = $user->currentLeadershipHierarchy();
@@ -570,5 +755,112 @@ class AdminUserController extends Controller
                 'target_team_ids' => 'Choose teams from the same batch when distributing members evenly.',
             ]);
         }
+    }
+
+    private function promoteUserIntoCurrentAssignment(User $user, User $actor): void
+    {
+        if ($user->role === User::ROLE_ADMIN) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Legacy admin accounts cannot be promoted through the bulk directory workflow.',
+            ]);
+        }
+
+        $hierarchy = $user->hierarchy()->first();
+
+        if (! $hierarchy) {
+            throw ValidationException::withMessages([
+                'user_ids' => "{$user->name} is not assigned to a hierarchy that can be promoted.",
+            ]);
+        }
+
+        if ($hierarchy->leader_id) {
+            throw ValidationException::withMessages([
+                'user_ids' => "{$hierarchy->name} already has a leader assigned.",
+            ]);
+        }
+
+        if (Hierarchy::query()->where('leader_id', $user->id)->exists()) {
+            throw ValidationException::withMessages([
+                'user_ids' => "{$user->name} already leads another hierarchy.",
+            ]);
+        }
+
+        $newRole = $this->expectedLeaderRoleForHierarchy($hierarchy);
+
+        $user->update([
+            'role' => $newRole,
+            'hierarchy_id' => $hierarchy->id,
+        ]);
+
+        $hierarchy->update([
+            'leader_id' => $user->id,
+        ]);
+
+        $this->auditLogger->log(
+            'hierarchy.leader_promoted_from_directory',
+            $actor,
+            $hierarchy->fresh('leader'),
+            [
+                'promoted_user' => $user->name,
+                'new_role' => $newRole,
+                'hierarchy' => $hierarchy->displayPath(),
+            ],
+            "Promoted {$user->name} into leadership for {$hierarchy->name} from the user directory.",
+        );
+    }
+
+    private function demoteLeaderFromDirectory(User $user, User $actor): void
+    {
+        $leadHierarchy = $user->currentLeadershipHierarchy();
+
+        if (! $leadHierarchy || $leadHierarchy->leader_id !== $user->id) {
+            throw ValidationException::withMessages([
+                'user_ids' => "{$user->name} is not the current leader of an assigned hierarchy.",
+            ]);
+        }
+
+        $targetTeam = $leadHierarchy->type === 'team'
+            ? $leadHierarchy
+            : $leadHierarchy->descendantTeamsIncludingSelf()->sortBy([
+                [fn (Hierarchy $hierarchy) => $hierarchy->members()->count(), 'asc'],
+                ['name', 'asc'],
+            ])->first();
+
+        if (! $targetTeam) {
+            throw ValidationException::withMessages([
+                'user_ids' => "{$leadHierarchy->name} has no descendant team available for a safe demotion.",
+            ]);
+        }
+
+        $leadHierarchy->update([
+            'leader_id' => null,
+        ]);
+
+        $user->update([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $targetTeam->id,
+        ]);
+
+        $this->auditLogger->log(
+            'hierarchy.leader_demoted_from_directory',
+            $actor,
+            $user->fresh('hierarchy.parent'),
+            [
+                'former_hierarchy' => $leadHierarchy->displayPath(),
+                'target_team' => $targetTeam->displayPath(),
+            ],
+            "Demoted {$user->name} from {$leadHierarchy->name} through the user directory.",
+        );
+    }
+
+    private function expectedLeaderRoleForHierarchy(Hierarchy $hierarchy): string
+    {
+        return match ($hierarchy->type) {
+            'clan' => User::ROLE_CLAN_LEADER,
+            'squad' => User::ROLE_SQUAD_LEADER,
+            'platoon' => User::ROLE_PLATOON_LEADER,
+            'batch' => User::ROLE_BATCH_LEADER,
+            default => User::ROLE_TEAM_LEADER,
+        };
     }
 }

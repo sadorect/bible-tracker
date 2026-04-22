@@ -19,6 +19,8 @@ class ReadingHistory extends Component
 
     public $userPlan;
 
+    public $participationSummary = [];
+
     public function mount()
     {
         $this->loadUserPlan();
@@ -49,6 +51,7 @@ class ReadingHistory extends Component
     {
         if (! $this->userPlan) {
             $this->readingHistory = [];
+            $this->participationSummary = [];
 
             return;
         }
@@ -111,6 +114,43 @@ class ReadingHistory extends Component
                 'actual_reading_date' => $actualReadingDate, // Store for potential sorting/filtering
             ];
         })->filter()->values()->toArray();
+
+        $currentParticipationId = $user->currentParticipationIdForPlan($this->userPlan->id);
+        $participations = $user->readingPlanParticipations()
+            ->where('reading_plan_id', $this->userPlan->id)
+            ->latest('participation_number')
+            ->get();
+        $currentParticipation = $participations->firstWhere('id', $currentParticipationId);
+        $completedCount = collect($this->readingHistory)->where('completed', true)->count();
+        $missedCount = collect($this->readingHistory)->where('completed', false)->where('is_break_day', false)->count();
+        $totalReadingDays = collect($this->readingHistory)->where('is_break_day', false)->count();
+
+        $this->participationSummary = [
+            'cycle_number' => $currentParticipation?->participation_number,
+            'status' => $currentParticipation?->status,
+            'started_on' => $currentParticipation?->started_on,
+            'last_completed_on' => $completedReadings->max('completed_date'),
+            'completed_count' => $completedCount,
+            'missed_count' => $missedCount,
+            'completion_rate' => $totalReadingDays > 0 ? round(($completedCount / $totalReadingDays) * 100) : 0,
+            'total_cycles' => $participations->count(),
+            'best_cycle' => $participations
+                ->map(function ($participation) use ($user) {
+                    $completedDays = ReadingProgress::query()
+                        ->where('user_id', $user->id)
+                        ->where('reading_plan_id', $participation->reading_plan_id)
+                        ->where('reading_plan_participation_id', $participation->id)
+                        ->distinct('daily_reading_id')
+                        ->count('daily_reading_id');
+
+                    return [
+                        'cycle_number' => $participation->participation_number,
+                        'completed_days' => $completedDays,
+                    ];
+                })
+                ->sortByDesc('completed_days')
+                ->first(),
+        ];
     }
 
     public function render()

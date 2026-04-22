@@ -25,11 +25,15 @@ class Message extends Model
         'body',
         'targeting_filters',
         'targeting_snapshot',
+        'sender_archived_at',
+        'sender_deleted_at',
     ];
 
     protected $casts = [
         'targeting_filters' => 'array',
         'targeting_snapshot' => 'array',
+        'sender_archived_at' => 'datetime',
+        'sender_deleted_at' => 'datetime',
     ];
 
     public static function directionOptions(): array

@@ -99,4 +99,42 @@ class ReadingPlanVisibilityTest extends TestCase
             'reading_plan_id' => $plan->id,
         ]);
     }
+
+    public function test_member_plan_index_highlights_a_recommended_next_cohort(): void
+    {
+        $user = User::factory()->create();
+
+        ReadingPlan::create([
+            'name' => 'NT Spring Cohort',
+            'type' => ReadingPlan::TYPE_NEW_TESTAMENT,
+            'lifecycle_status' => ReadingPlan::STATUS_RECRUITING,
+            'chapters_per_day' => 9,
+            'streak_days' => 10,
+            'break_days' => 1,
+            'start_date' => now()->addDays(5),
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addDays(5),
+            'is_active' => true,
+        ]);
+
+        ReadingPlan::create([
+            'name' => 'OT Summer Cohort',
+            'type' => ReadingPlan::TYPE_OLD_TESTAMENT,
+            'lifecycle_status' => ReadingPlan::STATUS_RECRUITING,
+            'chapters_per_day' => 8,
+            'streak_days' => 10,
+            'break_days' => 1,
+            'start_date' => now()->addDays(10),
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addDays(10),
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('reading-plans.index'))
+            ->assertOk()
+            ->assertSee('Recommended next')
+            ->assertSee('Start with a New Testament cohort first.')
+            ->assertSee('NT Spring Cohort');
+    }
 }

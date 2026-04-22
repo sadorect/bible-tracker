@@ -3,12 +3,13 @@
 namespace App\Notifications;
 
 use App\Models\User;
-use App\Services\Automation\AutomationSettings;
+use App\Services\Notifications\NotificationPreferenceResolver;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class AutomationAlertNotification extends Notification
+class AutomationAlertNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -20,23 +21,24 @@ class AutomationAlertNotification extends Notification
         private readonly ?string $actionLabel = null,
         private readonly string $tone = 'slate',
         private readonly string $category = 'automation',
+        private readonly array $extraData = [],
     ) {
     }
 
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
-        $settings = app(AutomationSettings::class);
+        $channels = [];
 
-        if ($settings->emailEnabled()
-            && $notifiable instanceof User
-            && filled($notifiable->email)
-            && in_array(
-                $notifiable->message_delivery_preference ?: User::MESSAGE_DELIVERY_BOTH,
-                [User::MESSAGE_DELIVERY_BOTH, User::MESSAGE_DELIVERY_EMAIL],
-                true
-            )) {
-            $channels[] = 'mail';
+        if ($notifiable instanceof User) {
+            $resolver = app(NotificationPreferenceResolver::class);
+
+            if ($resolver->allowsDatabase($notifiable, $this->category)) {
+                $channels[] = 'database';
+            }
+
+            if ($resolver->allowsMail($notifiable, $this->category) && filled($notifiable->email)) {
+                $channels[] = 'mail';
+            }
         }
 
         return array_unique($channels);
@@ -44,7 +46,7 @@ class AutomationAlertNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
-        return [
+        return array_merge([
             'title' => $this->title,
             'body' => $this->body,
             'notification_key' => $this->notificationKey,
@@ -53,7 +55,7 @@ class AutomationAlertNotification extends Notification
             'tone' => $this->tone,
             'category' => $this->category,
             'sent_at' => now()->toIso8601String(),
-        ];
+        ], $this->extraData);
     }
 
     public function toMail(object $notifiable): MailMessage

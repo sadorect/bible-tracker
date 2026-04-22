@@ -16,7 +16,15 @@
                     <h2 class="mt-2 text-2xl font-semibold text-slate-900">See unread and read conversations</h2>
                 </div>
 
-                <form method="GET" action="{{ route('messages.inbox') }}" class="grid gap-3 sm:grid-cols-3">
+                <form method="GET" action="{{ route('messages.inbox') }}" class="grid gap-3 sm:grid-cols-4">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Folder</span>
+                        <select name="folder" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="inbox" {{ $filters['folder'] === 'inbox' ? 'selected' : '' }}>Inbox</option>
+                            <option value="archive" {{ $filters['folder'] === 'archive' ? 'selected' : '' }}>Archive</option>
+                            <option value="trash" {{ $filters['folder'] === 'trash' ? 'selected' : '' }}>Trash</option>
+                        </select>
+                    </label>
                     <label class="block">
                         <span class="text-sm font-medium text-slate-700">State</span>
                         <select name="state" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
@@ -51,6 +59,12 @@
                                     @if(!$item->read_at)
                                         <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Unread</span>
                                     @endif
+                                    @if($item->archived_at && !$item->deleted_at)
+                                        <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Archived</span>
+                                    @endif
+                                    @if($item->deleted_at)
+                                        <span class="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">Trash</span>
+                                    @endif
                                     <p class="truncate text-sm font-semibold text-slate-900">{{ $item->rendered_subject }}</p>
                                 </div>
                                 <p class="mt-2 text-sm text-slate-500">From {{ $item->message->sender->name }}</p>
@@ -63,7 +77,7 @@
                     </a>
                 @empty
                     <div class="px-6 py-16 text-center text-sm text-slate-500">
-                        Your inbox is empty.
+                        No conversations match this folder yet.
                     </div>
                 @endforelse
             </div>

@@ -8,12 +8,11 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     /**
-     * Define the application's command schedule.
+     * Scheduling is registered from bootstrap/app.php via withSchedule().
+     * This class remains available for Artisan command discovery.
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Check reading plan progress daily at midnight
-        $schedule->command('reading:check-progress')->dailyAt('00:01');
-        $schedule->command('automation:run-daily')->dailyAt('06:30');
+        //
     }
 }

@@ -35,6 +35,84 @@
             </article>
         </section>
 
+        <section class="grid gap-6 xl:grid-cols-2">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Workflow</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Guided horizontal migration</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Move a full branch under a different parent at the same level, preview the impact, and confirm the relocation safely.</p>
+                </div>
+
+                <form method="GET" action="{{ route('admin.hierarchies.migration.preview') }}" class="mt-6 space-y-5">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Source group</span>
+                        <select name="source_hierarchy_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select branch to move</option>
+                            @foreach($hierarchies->whereNotNull('parent_id') as $hierarchy)
+                                <option value="{{ $hierarchy->id }}">
+                                    {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }} · {{ $displayPaths[$hierarchy->id] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Destination parent</span>
+                        <select name="destination_parent_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select new parent</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}">
+                                    {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }} · {{ $displayPaths[$hierarchy->id] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        Preview migration
+                    </button>
+                </form>
+            </div>
+
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Workflow</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">True sibling merge</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Combine two sibling groups, review the members and descendants that will move, and decide exactly how the merged leadership should land.</p>
+                </div>
+
+                <form method="GET" action="{{ route('admin.hierarchies.merge.preview') }}" class="mt-6 space-y-5">
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Source group</span>
+                        <select name="source_hierarchy_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select group to retire</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}">
+                                    {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }} · {{ $displayPaths[$hierarchy->id] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Target group</span>
+                        <select name="target_hierarchy_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Select surviving sibling</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}">
+                                    {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }} · {{ $displayPaths[$hierarchy->id] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                        Review merge
+                    </button>
+                </form>
+            </div>
+        </section>
+
         <section class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
                 <div>
@@ -129,6 +207,45 @@
             </div>
         </section>
 
+        @if($hierarchies->whereNull('leader_id')->isNotEmpty())
+            <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Vacancy resolution</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Groups still waiting for a leader</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">Jump straight into a single-group resolution flow to assign an existing leader or promote someone already in the group.</p>
+                    </div>
+                    <a href="{{ route('notifications.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white">
+                        Open alerts
+                    </a>
+                </div>
+
+                <div class="mt-6 grid gap-4 xl:grid-cols-2">
+                    @foreach($hierarchies->whereNull('leader_id') as $vacancy)
+                        <article class="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-5">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-slate-900">{{ $vacancy->name }}</h3>
+                                    <p class="mt-1 text-sm text-slate-600">{{ $displayPaths[$vacancy->id] }}</p>
+                                </div>
+                                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700">
+                                    Vacant
+                                </span>
+                            </div>
+                            <div class="mt-4 flex flex-wrap gap-3">
+                                <a href="{{ route('admin.hierarchies.resolve-vacancy', $vacancy) }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                    Resolve now
+                                </a>
+                                <a href="{{ route('admin.hierarchies.show', $vacancy) }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                                    View hierarchy
+                                </a>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         @if($teamBalanceInsights->isNotEmpty())
             <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -144,6 +261,7 @@
 
                 <div class="mt-6 grid gap-4 xl:grid-cols-2">
                     @foreach($teamBalanceInsights as $insight)
+                        @php($heaviestTeam = $insight['child_teams']->last())
                         <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-5">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
@@ -165,6 +283,20 @@
                             </div>
 
                             <p class="mt-4 text-sm text-slate-600">Suggested move target: about {{ $insight['suggested_moves'] }} member(s) from the heaviest team toward the lightest team.</p>
+                            <div class="mt-4 flex flex-wrap gap-3">
+                                <a href="{{ route('admin.users.index', [
+                                    'action' => 'distribute_evenly',
+                                    'hierarchy_id' => $heaviestTeam['team']->id,
+                                    'source_team_id' => $heaviestTeam['team']->id,
+                                    'suggested_move_count' => $insight['suggested_moves'],
+                                    'target_team_ids' => $insight['child_teams']->pluck('team.id')->all(),
+                                ]) }}" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                    Launch rebalance action
+                                </a>
+                                <a href="{{ route('admin.hierarchies.show', $insight['batch']) }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                                    Open batch
+                                </a>
+                            </div>
                         </article>
                     @endforeach
                 </div>

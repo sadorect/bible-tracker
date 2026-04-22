@@ -351,6 +351,16 @@ class AutomationRunner
             ->take(5)
             ->map(fn (Hierarchy $hierarchy) => $hierarchy->displayPath())
             ->implode(', ');
+        $vacancyActions = $vacancies
+            ->take(5)
+            ->map(fn (Hierarchy $hierarchy) => [
+                'hierarchy_id' => $hierarchy->id,
+                'path' => $hierarchy->displayPath(),
+                'resolve_url' => route('admin.hierarchies.resolve-vacancy', $hierarchy),
+                'detail_url' => route('admin.hierarchies.show', $hierarchy),
+            ])
+            ->values()
+            ->all();
         $additionalCount = max($vacancies->count() - 5, 0);
         $body = "{$vacancies->count()} hierarchy slot(s) are currently vacant: {$vacancyList}";
 
@@ -373,10 +383,14 @@ class AutomationRunner
                 'Leadership vacancies need attention',
                 $body,
                 $notificationKey,
-                route('admin.hierarchies.index'),
-                'Review hierarchy',
+                $vacancyActions[0]['resolve_url'] ?? route('admin.hierarchies.index'),
+                'Resolve first vacancy',
                 'amber',
                 'vacancy_alert',
+                [
+                    'vacancies' => $vacancyActions,
+                    'additional_count' => $additionalCount,
+                ],
             ));
 
             $sent++;

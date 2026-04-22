@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Support\SchemaCapabilities;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +31,10 @@ class ProfileController extends Controller
 
         if ($request->user()->message_delivery_preference_locked) {
             unset($validated['message_delivery_preference']);
+        }
+
+        if (! SchemaCapabilities::supportsNotificationPreferences()) {
+            unset($validated['notification_preferences']);
         }
 
         $request->user()->fill($validated);

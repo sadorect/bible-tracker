@@ -10,7 +10,15 @@
         @include('messages.partials.nav')
 
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
-            <form method="GET" action="{{ route('messages.sent') }}" class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <form method="GET" action="{{ route('messages.sent') }}" class="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)_auto] sm:items-end">
+                <label class="block">
+                    <span class="text-sm font-medium text-slate-700">Folder</span>
+                    <select name="folder" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        <option value="sent" {{ $filters['folder'] === 'sent' ? 'selected' : '' }}>Sent</option>
+                        <option value="archive" {{ $filters['folder'] === 'archive' ? 'selected' : '' }}>Archive</option>
+                        <option value="trash" {{ $filters['folder'] === 'trash' ? 'selected' : '' }}>Trash</option>
+                    </select>
+                </label>
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">Search</span>
                     <input type="text" name="search" value="{{ $filters['search'] }}" placeholder="Subject or body" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
@@ -33,6 +41,12 @@
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">{{ ucfirst($message->direction) }}</span>
+                                    @if($message->sender_archived_at && !$message->sender_deleted_at)
+                                        <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Archived</span>
+                                    @endif
+                                    @if($message->sender_deleted_at)
+                                        <span class="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">Trash</span>
+                                    @endif
                                     @if($message->template)
                                         <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{{ $message->template->name }}</span>
                                     @endif
@@ -55,7 +69,7 @@
                     </a>
                 @empty
                     <div class="px-6 py-16 text-center text-sm text-slate-500">
-                        You have not sent any messages yet.
+                        No sent conversations match this folder yet.
                     </div>
                 @endforelse
             </div>

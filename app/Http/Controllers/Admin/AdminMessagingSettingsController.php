@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\MessageTemplate;
 use App\Models\User;
+use App\Services\Auditing\AuditLogger;
 use App\Services\Messaging\MessageVariableRenderer;
 use App\Services\Messaging\MessagingSettings;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +19,7 @@ class AdminMessagingSettingsController extends Controller
     public function __construct(
         private readonly MessagingSettings $settings,
         private readonly MessageVariableRenderer $variableRenderer,
+        private readonly AuditLogger $auditLogger,
     ) {
     }
 
@@ -48,6 +50,17 @@ class AdminMessagingSettingsController extends Controller
             MessagingSettings::KEY_EMAIL_ENABLED => $request->boolean('email_enabled'),
         ]);
 
+        $this->auditLogger->log(
+            'messages.settings_updated',
+            $request->user(),
+            null,
+            [
+                'default_delivery' => $validated['default_delivery'],
+                'email_enabled' => $request->boolean('email_enabled'),
+            ],
+            'Updated messaging settings.',
+        );
+
         return back()->with('success', 'Messaging settings updated successfully.');
     }
 
@@ -62,11 +75,21 @@ class AdminMessagingSettingsController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        MessageTemplate::create([
+        $template = MessageTemplate::create([
             ...$validated,
             'created_by' => $request->user()->id,
             'is_active' => $request->boolean('is_active', true),
         ]);
+
+        $this->auditLogger->log(
+            'messages.template_created',
+            $request->user(),
+            $template,
+            [
+                'is_active' => $template->is_active,
+            ],
+            "Created message template {$template->name}.",
+        );
 
         return back()->with('success', 'Message template created successfully.');
     }
@@ -87,6 +110,16 @@ class AdminMessagingSettingsController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        $this->auditLogger->log(
+            'messages.template_updated',
+            $request->user(),
+            $messageTemplate,
+            [
+                'is_active' => $messageTemplate->is_active,
+            ],
+            "Updated message template {$messageTemplate->name}.",
+        );
+
         return back()->with('success', 'Message template updated successfully.');
     }
 
@@ -94,7 +127,16 @@ class AdminMessagingSettingsController extends Controller
     {
         Gate::authorize('manage-message-templates');
 
+        $name = $messageTemplate->name;
         $messageTemplate->delete();
+
+        $this->auditLogger->log(
+            'messages.template_deleted',
+            request()->user(),
+            $messageTemplate,
+            [],
+            "Deleted message template {$name}.",
+        );
 
         return back()->with('success', 'Message template deleted successfully.');
     }

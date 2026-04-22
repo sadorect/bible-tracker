@@ -406,6 +406,56 @@ class MessageCenterTest extends TestCase
         );
     }
 
+    public function test_member_can_archive_trash_and_restore_a_conversation(): void
+    {
+        Queue::fake();
+
+        $teamLeader = $this->createUser(User::ROLE_TEAM_LEADER, ['name' => 'Team Leader']);
+        $team = $this->createHierarchy('Team Alpha', 'team', $teamLeader);
+        $member = $this->createUser(User::ROLE_MEMBER, [
+            'name' => 'Member',
+            'hierarchy_id' => $team->id,
+        ]);
+
+        $this->actingAs($teamLeader)->post(route('messages.store'), $this->composePayload([
+            'subject' => 'Folder workflow',
+            'body' => 'Track this thread',
+            'hierarchy_ids' => [$team->id],
+            'recipient_ids' => [$member->id],
+        ]))->assertRedirect();
+
+        $thread = Message::query()->latest('id')->firstOrFail();
+        $recipientRow = MessageRecipient::query()
+            ->where('message_id', $thread->id)
+            ->where('recipient_id', $member->id)
+            ->firstOrFail();
+
+        $this->actingAs($member)
+            ->patch(route('messages.archive', $thread))
+            ->assertRedirect();
+
+        $this->assertNotNull($recipientRow->fresh()->archived_at);
+
+        $this->actingAs($member)
+            ->get(route('messages.inbox', ['folder' => 'archive']))
+            ->assertOk()
+            ->assertSee('Folder workflow');
+
+        $this->actingAs($member)
+            ->patch(route('messages.trash', $thread))
+            ->assertRedirect(route('messages.inbox', ['folder' => 'trash']));
+
+        $this->assertNotNull($recipientRow->fresh()->deleted_at);
+
+        $this->actingAs($member)
+            ->patch(route('messages.restore', $thread))
+            ->assertRedirect(route('messages.inbox'));
+
+        $recipientRow->refresh();
+        $this->assertNull($recipientRow->archived_at);
+        $this->assertNull($recipientRow->deleted_at);
+    }
+
     private function composePayload(array $overrides = []): array
     {
         return array_merge([

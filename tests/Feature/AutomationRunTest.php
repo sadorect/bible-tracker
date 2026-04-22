@@ -193,7 +193,7 @@ class AutomationRunTest extends TestCase
             'message_delivery_preference' => User::MESSAGE_DELIVERY_INBOX,
         ]);
 
-        Hierarchy::create([
+        $vacantTeam = Hierarchy::create([
             'name' => 'Team Vacant',
             'type' => 'team',
             'leader_id' => null,
@@ -201,8 +201,52 @@ class AutomationRunTest extends TestCase
 
         $this->artisan('automation:run-daily')->assertSuccessful();
 
-        $this->assertTrue($admin->fresh()->notifications->contains(function ($notification) {
-            return $notification->data['category'] === 'vacancy_alert';
-        }));
+        $notification = $admin->fresh()->notifications->firstWhere('data.category', 'vacancy_alert');
+
+        $this->assertNotNull($notification);
+        $this->assertSame(route('admin.hierarchies.resolve-vacancy', $vacantTeam), $notification->data['action_url']);
+        $this->assertSame('Team Vacant', data_get($notification->data, 'vacancies.0.path'));
+    }
+
+    public function test_notification_preferences_can_disable_reminders_but_admin_vacancy_alerts_still_arrive(): void
+    {
+        $member = User::factory()->create([
+            'message_delivery_preference' => User::MESSAGE_DELIVERY_INBOX,
+            'notification_preferences' => [
+                'reminders' => User::NOTIFICATION_DELIVERY_OFF,
+            ],
+        ]);
+
+        $member->notify(new AutomationAlertNotification(
+            'Reading reminder',
+            'Today is ready.',
+            'reading-pref-test',
+            route('dashboard'),
+            'Open dashboard',
+            'emerald',
+            'reading_reminder',
+        ));
+
+        $this->assertCount(0, $member->fresh()->notifications);
+
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'message_delivery_preference' => User::MESSAGE_DELIVERY_INBOX,
+            'notification_preferences' => [
+                'vacancy_alert' => User::NOTIFICATION_DELIVERY_OFF,
+            ],
+        ]);
+
+        $admin->notify(new AutomationAlertNotification(
+            'Vacancy alert',
+            'A team has no leader.',
+            'vacancy-pref-test',
+            route('admin.hierarchies.index'),
+            'Open hierarchies',
+            'amber',
+            'vacancy_alert',
+        ));
+
+        $this->assertCount(1, $admin->fresh()->notifications);
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\Automation\AutomationRunner;
+use App\Jobs\RunAutomationCycle;
 use App\Services\Automation\AutomationSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,7 +12,6 @@ class AdminAutomationController extends Controller
 {
     public function __construct(
         private readonly AutomationSettings $settings,
-        private readonly AutomationRunner $automationRunner,
     ) {
     }
 
@@ -40,12 +39,8 @@ class AdminAutomationController extends Controller
 
     public function runNow(Request $request): RedirectResponse
     {
-        $summary = $this->automationRunner->run(today(), true, $request->user());
+        RunAutomationCycle::dispatch(now()->toDateString(), true, $request->user()->id);
 
-        return back()->with('success', 'Automation ran successfully: '
-            ."{$summary['member_reading_reminders']} reading reminders, "
-            ."{$summary['member_training_reminders']} training reminders, "
-            ."{$summary['leader_digests']} leader digests, "
-            ."{$summary['admin_digests']} admin digests.");
+        return back()->with('success', 'Automation cycle queued successfully.');
     }
 }

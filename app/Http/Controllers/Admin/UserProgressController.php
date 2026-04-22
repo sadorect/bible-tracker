@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyReading;
 use App\Models\ReadingPlan;
 use App\Models\ReadingProgress;
 use App\Models\ReportPreset;
@@ -35,13 +36,14 @@ class UserProgressController extends Controller
 
         $progress = $progressQuery
             ->orderByDesc('reading_progress.completed_date')
-            ->paginate(15)
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
         return view('admin.progress.index', [
             'users' => $scopeData['users'],
             'readingPlans' => $scopeData['plans'],
             'hierarchies' => $scopeData['hierarchies'],
+            'hierarchyDisplayPaths' => $scopeData['hierarchy_display_paths'],
             'progress' => $progress,
             'stats' => $this->buildStats($filters, $scopeData),
             'filters' => $filters,
@@ -52,6 +54,7 @@ class UserProgressController extends Controller
             'trainingStatusOptions' => $this->trainingStatusOptions(),
             'reportPresets' => $actor->reportPresets()->latest()->get(),
             'reportTypeOptions' => $this->reportTypeOptions(),
+            'allowedPerPage' => [15, 25, 50, 100],
         ]);
     }
 
@@ -61,14 +64,27 @@ class UserProgressController extends Controller
 
         abort_unless($this->reportScope->canAccessUser($actor, $user), 403);
 
+        $user->loadMissing('readingPlans');
         $userPlans = $user->readingPlans;
         $totalCompletions = $user->readingProgress()->count();
         $currentStreak = $user->readingPlans()->wherePivot('is_active', true)->first()?->pivot->current_streak ?? 0;
+        $planIds = $userPlans->pluck('id');
+        $totalDaysByPlan = DailyReading::query()
+            ->select('reading_plan_id', DB::raw('count(*) as total_days'))
+            ->whereIn('reading_plan_id', $planIds)
+            ->where('is_break_day', false)
+            ->groupBy('reading_plan_id')
+            ->pluck('total_days', 'reading_plan_id');
+        $completedDaysByPlan = $user->readingProgress()
+            ->select('reading_plan_id', DB::raw('count(*) as completed_days'))
+            ->whereIn('reading_plan_id', $planIds)
+            ->groupBy('reading_plan_id')
+            ->pluck('completed_days', 'reading_plan_id');
 
         $planStats = [];
         foreach ($userPlans as $plan) {
-            $totalDays = $plan->dailyReadings()->where('is_break_day', false)->count();
-            $completedDays = $user->readingProgress()->where('reading_plan_id', $plan->id)->count();
+            $totalDays = (int) ($totalDaysByPlan[$plan->id] ?? 0);
+            $completedDays = (int) ($completedDaysByPlan[$plan->id] ?? 0);
             $completionRate = $totalDays > 0 ? ($completedDays / $totalDays) * 100 : 0;
 
             $planStats[] = [
@@ -115,22 +131,33 @@ class UserProgressController extends Controller
 
         abort_unless($this->reportScope->canAccessPlan($actor, $readingPlan), 403);
 
-        $scopedUserIds = $this->reportScope->accessibleUsers($actor)->pluck('id');
+        $scopedUserIds = $this->reportScope->accessibleUserIds($actor) ?? collect();
+        $limitToScopedUsers = ! $this->reportScope->isGlobal($actor);
         $planUsers = $readingPlan->users()
-            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('users.id', $scopedUserIds))
+            ->with(['hierarchy.parent'])
+            ->when($limitToScopedUsers, fn (Builder $query) => $query->whereIn('users.id', $scopedUserIds))
             ->get();
+        $totalDays = (int) DailyReading::query()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->where('is_break_day', false)
+            ->count();
+        $completedDaysByUser = ReadingProgress::query()
+            ->select('user_id', DB::raw('count(*) as completed_days'))
+            ->where('reading_plan_id', $readingPlan->id)
+            ->when($limitToScopedUsers, fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
+            ->groupBy('user_id')
+            ->pluck('completed_days', 'user_id');
 
         $totalCompletions = ReadingProgress::query()
             ->where('reading_plan_id', $readingPlan->id)
-            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
+            ->when($limitToScopedUsers, fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
             ->count();
         $totalUsers = $planUsers->count();
         $activeUsers = $planUsers->where('pivot.is_active', true)->count();
 
         $userStats = [];
         foreach ($planUsers as $user) {
-            $totalDays = $readingPlan->dailyReadings()->where('is_break_day', false)->count();
-            $completedDays = $user->readingProgress()->where('reading_plan_id', $readingPlan->id)->count();
+            $completedDays = (int) ($completedDaysByUser[$user->id] ?? 0);
             $completionRate = $totalDays > 0 ? ($completedDays / $totalDays) * 100 : 0;
 
             $userStats[] = [
@@ -149,7 +176,7 @@ class UserProgressController extends Controller
         $recentActivity = ReadingProgress::query()
             ->with(['user', 'dailyReading'])
             ->where('reading_plan_id', $readingPlan->id)
-            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
+            ->when($limitToScopedUsers, fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
             ->orderByDesc('completed_date')
             ->limit(10)
             ->get();
@@ -157,7 +184,7 @@ class UserProgressController extends Controller
         $completionTrend = ReadingProgress::query()
             ->select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
             ->where('reading_plan_id', $readingPlan->id)
-            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
+            ->when($limitToScopedUsers, fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
             ->where('completed_date', '>=', Carbon::now()->subDays(30))
             ->groupBy('date')
             ->orderBy('date')
@@ -219,6 +246,8 @@ class UserProgressController extends Controller
     public function storePreset(Request $request)
     {
         $actor = $request->user();
+        $filters = $this->filtersFromRequest($request);
+        unset($filters['per_page']);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -226,10 +255,10 @@ class UserProgressController extends Controller
 
         $actor->reportPresets()->create([
             'name' => $validated['name'],
-            'filters' => $this->filtersFromRequest($request),
+            'filters' => $filters,
         ]);
 
-        return redirect()->route('admin.progress.index', $this->filtersFromRequest($request))
+        return redirect()->route('admin.progress.index', $filters)
             ->with('success', 'Report preset saved successfully.');
     }
 
@@ -244,6 +273,9 @@ class UserProgressController extends Controller
 
     private function filtersFromRequest(Request $request): array
     {
+        $perPage = (int) $request->integer('per_page', 15);
+        $allowedPerPage = [15, 25, 50, 100];
+
         return [
             'user_id' => $request->integer('user_id'),
             'plan_id' => $request->integer('plan_id'),
@@ -254,6 +286,7 @@ class UserProgressController extends Controller
             'date_range' => $request->string('date_range')->toString() ?: 'all',
             'start_date' => $request->string('start_date')->toString(),
             'end_date' => $request->string('end_date')->toString(),
+            'per_page' => in_array($perPage, $allowedPerPage, true) ? $perPage : 15,
         ];
     }
 
@@ -269,6 +302,7 @@ class UserProgressController extends Controller
             'user_ids' => $users->pluck('id')->all(),
             'plans' => $plans,
             'hierarchies' => $hierarchies,
+            'hierarchy_display_paths' => \App\Models\Hierarchy::buildDisplayPaths($hierarchies),
             'derived_user_ids' => $derivedUserIds,
             'scope_label' => $this->reportScope->scopeLabel($actor),
         ];

@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\MessageRecipient;
 use App\Models\MessageTemplate;
 use App\Models\User;
+use App\Support\SchemaCapabilities;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -112,6 +113,53 @@ class MessageCenterService
         );
     }
 
+    public function archiveThread(User $user, Message $threadRoot): void
+    {
+        $this->updateThreadState($user, $threadRoot, 'archive');
+    }
+
+    public function trashThread(User $user, Message $threadRoot): void
+    {
+        $this->updateThreadState($user, $threadRoot, 'trash');
+    }
+
+    public function restoreThread(User $user, Message $threadRoot): void
+    {
+        $this->updateThreadState($user, $threadRoot, 'restore');
+    }
+
+    public function threadFolderState(User $user, Message $threadRoot): array
+    {
+        $root = $threadRoot->fresh();
+        $recipientRow = MessageRecipient::query()
+            ->where('recipient_id', $user->id)
+            ->where('message_id', $root->id)
+            ->first();
+
+        if ($recipientRow) {
+            return [
+                'mailbox' => 'inbox',
+                'folder' => SchemaCapabilities::supportsMessageRecipientFolders()
+                    ? ($recipientRow->deleted_at ? 'trash' : ($recipientRow->archived_at ? 'archive' : 'inbox'))
+                    : 'inbox',
+            ];
+        }
+
+        if ($root->sender_id === $user->id) {
+            return [
+                'mailbox' => 'sent',
+                'folder' => SchemaCapabilities::supportsMessageSenderFolders()
+                    ? ($root->sender_deleted_at ? 'trash' : ($root->sender_archived_at ? 'archive' : 'sent'))
+                    : 'sent',
+            ];
+        }
+
+        return [
+            'mailbox' => 'inbox',
+            'folder' => 'inbox',
+        ];
+    }
+
     private function storeMessage(
         User $sender,
         EloquentCollection $recipients,
@@ -207,5 +255,49 @@ class MessageCenterService
         return $recipients
             ->reject(fn (User $recipient) => $excluded->contains($recipient->id))
             ->values();
+    }
+
+    private function updateThreadState(User $user, Message $threadRoot, string $action): void
+    {
+        DB::transaction(function () use ($user, $threadRoot, $action) {
+            $recipientRows = MessageRecipient::query()
+                ->where('recipient_id', $user->id)
+                ->whereHas('message', fn ($query) => $query->where('thread_root_id', $threadRoot->id));
+            $sentMessages = Message::query()
+                ->where('sender_id', $user->id)
+                ->where('thread_root_id', $threadRoot->id);
+
+            if (SchemaCapabilities::supportsMessageRecipientFolders()) {
+                match ($action) {
+                    'archive' => $recipientRows->update([
+                        'archived_at' => now(),
+                        'deleted_at' => null,
+                    ]),
+                    'trash' => $recipientRows->update([
+                        'deleted_at' => now(),
+                    ]),
+                    default => $recipientRows->update([
+                        'archived_at' => null,
+                        'deleted_at' => null,
+                    ]),
+                };
+            }
+
+            if (SchemaCapabilities::supportsMessageSenderFolders()) {
+                match ($action) {
+                    'archive' => $sentMessages->update([
+                        'sender_archived_at' => now(),
+                        'sender_deleted_at' => null,
+                    ]),
+                    'trash' => $sentMessages->update([
+                        'sender_deleted_at' => now(),
+                    ]),
+                    default => $sentMessages->update([
+                        'sender_archived_at' => null,
+                        'sender_deleted_at' => null,
+                    ]),
+                };
+            }
+        });
     }
 }

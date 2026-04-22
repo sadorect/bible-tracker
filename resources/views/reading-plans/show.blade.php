@@ -168,11 +168,31 @@
                     </div>
                 </div>
 
-                @if($participationHistory->isNotEmpty())
+                @if($participationHistorySummary['total_cycles'] > 0)
                     <div class="mt-8 rounded-[1.5rem] bg-stone-50 p-5">
-                        <h4 class="text-lg font-semibold text-slate-900">Your participation history</h4>
+                        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                            <div>
+                                <h4 class="text-lg font-semibold text-slate-900">Your participation history</h4>
+                                <p class="mt-2 text-sm text-slate-600">Each cycle stays on your record so you can compare progress over time.</p>
+                            </div>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-[1.25rem] bg-white px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Cycles</p>
+                                    <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $participationHistorySummary['total_cycles'] }}</p>
+                                </div>
+                                <div class="rounded-[1.25rem] bg-white px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Best cycle</p>
+                                    <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $participationHistorySummary['best_cycle']['completion_rate'] ?? 0 }}%</p>
+                                </div>
+                                <div class="rounded-[1.25rem] bg-white px-4 py-3">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Latest cycle</p>
+                                    <p class="mt-2 text-2xl font-semibold text-slate-900">#{{ $participationHistorySummary['latest_cycle']['participation']->participation_number ?? 0 }}</p>
+                                </div>
+                            </div>
+                        </div>
                         <div class="mt-4 grid gap-3">
-                            @foreach($participationHistory as $participation)
+                            @foreach($participationHistorySummary['cycles'] as $cycle)
+                                @php($participation = $cycle['participation'])
                                 <div class="rounded-[1.25rem] border border-stone-200 bg-white px-4 py-4">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
                                         <div>
@@ -185,6 +205,24 @@
                                             </p>
                                         </div>
                                         <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ ucfirst($participation->status) }}</span>
+                                    </div>
+                                    <div class="mt-4 grid gap-3 sm:grid-cols-4">
+                                        <div class="rounded-[1rem] bg-stone-50 px-3 py-3">
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-500">Completion</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">{{ $cycle['completion_rate'] }}%</p>
+                                        </div>
+                                        <div class="rounded-[1rem] bg-stone-50 px-3 py-3">
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-500">Days done</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">{{ $cycle['completed_days'] }} / {{ $cycle['required_days'] }}</p>
+                                        </div>
+                                        <div class="rounded-[1rem] bg-stone-50 px-3 py-3">
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-500">Joined via</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">{{ $cycle['join_source_label'] }}</p>
+                                        </div>
+                                        <div class="rounded-[1rem] bg-stone-50 px-3 py-3">
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-500">Last completion</p>
+                                            <p class="mt-1 text-sm font-semibold text-slate-900">{{ $cycle['last_completed_on']?->format('M d, Y') ?? 'None yet' }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
@@ -240,6 +278,17 @@
                         @endif
                     </div>
                 </div>
+
+                @if($nextSteps !== [])
+                    <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Next steps</p>
+                        <div class="mt-4 space-y-3">
+                            @foreach($nextSteps as $step)
+                                <div class="rounded-[1.35rem] bg-stone-50 px-4 py-3 text-sm text-slate-700">{{ $step }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
                     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Cadence reminder</p>

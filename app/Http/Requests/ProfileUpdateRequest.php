@@ -29,6 +29,23 @@ class ProfileUpdateRequest extends FormRequest
                 'nullable',
                 Rule::in(array_keys(User::messageDeliveryOptions())),
             ],
+            'notification_preferences' => ['array'],
+            'notification_preferences.reminders' => [
+                'nullable',
+                Rule::in(array_keys(User::notificationDeliveryOptions())),
+            ],
+            'notification_preferences.leader_digest' => [
+                'nullable',
+                Rule::in(array_keys(User::notificationDeliveryOptions())),
+            ],
+            'notification_preferences.admin_digest' => [
+                'nullable',
+                Rule::in(array_keys(User::notificationDeliveryOptions())),
+            ],
+            'notification_preferences.vacancy_alert' => [
+                'nullable',
+                Rule::in(array_keys(User::notificationDeliveryOptions())),
+            ],
         ];
     }
 }

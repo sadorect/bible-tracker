@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Auditing\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
@@ -129,6 +130,7 @@ class DashboardController extends Controller
     public function manageHierarchy(Request $request)
     {
         $user = auth()->user();
+        $perPage = $this->leaderMonitoringPerPage($request);
 
         abort_unless($user->canManageHierarchy(), 403);
 
@@ -139,6 +141,7 @@ class DashboardController extends Controller
                 'leadHierarchy' => null,
                 'scopeHierarchies' => collect(),
                 'memberSnapshots' => collect(),
+                'manageableTeams' => collect(),
                 'summary' => [
                     'total_monitored' => 0,
                     'in_training' => 0,
@@ -148,13 +151,23 @@ class DashboardController extends Controller
                     'reading_ahead' => 0,
                     'no_active_plan' => 0,
                 ],
+                'filters' => [
+                    'status' => '',
+                    'hierarchy_id' => 0,
+                    'search' => '',
+                    'per_page' => $perPage,
+                ],
+                'statusOptions' => [],
+                'allMemberSnapshots' => collect(),
+                'allowedPerPage' => [25, 50, 100],
             ]);
         }
 
-        $scopeHierarchies = Hierarchy::with(['parent', 'leader', 'children'])
+        $scopeHierarchies = Hierarchy::with('parent')
             ->whereIn('id', $leadHierarchy->descendantIdsIncludingSelf())
+            ->ordered()
             ->get();
-        $manageableTeams = $leadHierarchy->descendantTeamsIncludingSelf();
+        $manageableTeams = $scopeHierarchies->where('type', 'team')->values();
 
         $scopeHierarchyIds = $scopeHierarchies->pluck('id');
         $leaderIds = $scopeHierarchies->pluck('leader_id')->filter();
@@ -180,9 +193,10 @@ class DashboardController extends Controller
             'status' => $request->string('status')->toString(),
             'hierarchy_id' => $request->integer('hierarchy_id'),
             'search' => trim($request->string('search')->toString()),
+            'per_page' => $perPage,
         ];
 
-        $memberSnapshots = $allMemberSnapshots
+        $filteredMemberSnapshots = $allMemberSnapshots
             ->when($filters['status'] !== '', function ($collection) use ($filters) {
                 return $collection->where('status_key', $filters['status']);
             })
@@ -204,13 +218,13 @@ class DashboardController extends Controller
             ->values();
 
         $summary = [
-            'total_monitored' => $memberSnapshots->count(),
-            'in_training' => $memberSnapshots->where('status_key', 'in_training')->count(),
-            'awaiting_start' => $memberSnapshots->where('status_key', 'awaiting_start')->count(),
-            'catching_up' => $memberSnapshots->where('status_key', 'catching_up')->count(),
-            'on_track' => $memberSnapshots->where('status_key', 'on_track')->count(),
-            'reading_ahead' => $memberSnapshots->where('status_key', 'reading_ahead')->count(),
-            'no_active_plan' => $memberSnapshots->where('status_key', 'no_active_plan')->count(),
+            'total_monitored' => $filteredMemberSnapshots->count(),
+            'in_training' => $filteredMemberSnapshots->where('status_key', 'in_training')->count(),
+            'awaiting_start' => $filteredMemberSnapshots->where('status_key', 'awaiting_start')->count(),
+            'catching_up' => $filteredMemberSnapshots->where('status_key', 'catching_up')->count(),
+            'on_track' => $filteredMemberSnapshots->where('status_key', 'on_track')->count(),
+            'reading_ahead' => $filteredMemberSnapshots->where('status_key', 'reading_ahead')->count(),
+            'no_active_plan' => $filteredMemberSnapshots->where('status_key', 'no_active_plan')->count(),
         ];
 
         $statusOptions = [
@@ -221,6 +235,8 @@ class DashboardController extends Controller
             'reading_ahead' => 'Reading Ahead',
             'no_active_plan' => 'No Active Plan',
         ];
+        $memberSnapshots = $this->paginateCollection($filteredMemberSnapshots, $perPage, $request);
+        $allowedPerPage = [25, 50, 100];
 
         return view('admin.hierarchy.manage-hierarchy', compact(
             'leadHierarchy',
@@ -231,6 +247,7 @@ class DashboardController extends Controller
             'filters',
             'statusOptions',
             'allMemberSnapshots',
+            'allowedPerPage',
         ));
     }
 
@@ -354,5 +371,30 @@ class DashboardController extends Controller
             'ahead_days' => $aheadDays,
             'last_completion_date' => $lastCompletion,
         ];
+    }
+
+    private function leaderMonitoringPerPage(Request $request): int
+    {
+        $perPage = (int) $request->integer('per_page', 25);
+        $allowedPerPage = [25, 50, 100];
+
+        return in_array($perPage, $allowedPerPage, true) ? $perPage : 25;
+    }
+
+    private function paginateCollection($items, int $perPage, Request $request): LengthAwarePaginator
+    {
+        $page = max((int) $request->integer('page', 1), 1);
+        $offset = ($page - 1) * $perPage;
+
+        return (new LengthAwarePaginator(
+            $items->slice($offset, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ],
+        ))->withQueryString();
     }
 }

@@ -7,15 +7,11 @@
 
     <title>{{ config('app.name', 'Bible Reading Tracker') }}</title>
 
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
 @php($user = auth()->user())
-<body class="bg-stone-100 font-['Instrument_Sans'] text-slate-900 antialiased" x-data="{ sidebarOpen: false }">
+<body class="bg-stone-100 font-sans text-slate-900 antialiased" x-data="{ sidebarOpen: false }">
     <div class="min-h-screen">
         <div
             x-show="sidebarOpen"
@@ -113,7 +109,7 @@
 
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-stone-300">
-                                <img class="h-10 w-10 rounded-2xl object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=0f172a&color=fff" alt="User avatar">
+                                <x-user-avatar :name="$user->name" class="h-10 w-10 rounded-2xl bg-slate-900 text-white" />
                                 <div class="hidden text-left sm:block">
                                     <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
                                     <p class="text-xs capitalize text-slate-500">{{ str_replace('_', ' ', $user->role) }}</p>

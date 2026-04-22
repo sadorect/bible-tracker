@@ -310,4 +310,187 @@ class AdminHierarchyManagementTest extends TestCase
             ->assertSee('Batch Insight')
             ->assertSee('Spread 4');
     }
+
+    public function test_admin_can_preview_and_complete_horizontal_branch_migration(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $squadLeader = User::factory()->create(['role' => User::ROLE_SQUAD_LEADER]);
+        $platoonLeaderOne = User::factory()->create(['role' => User::ROLE_PLATOON_LEADER]);
+        $platoonLeaderTwo = User::factory()->create(['role' => User::ROLE_PLATOON_LEADER]);
+        $batchLeader = User::factory()->create(['role' => User::ROLE_BATCH_LEADER]);
+        $teamLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $squad = Hierarchy::create([
+            'name' => 'Squad North',
+            'type' => 'squad',
+            'leader_id' => $squadLeader->id,
+        ]);
+
+        $platoonAlpha = Hierarchy::create([
+            'name' => 'Platoon Alpha',
+            'type' => 'platoon',
+            'leader_id' => $platoonLeaderOne->id,
+            'parent_id' => $squad->id,
+        ]);
+
+        $platoonBravo = Hierarchy::create([
+            'name' => 'Platoon Bravo',
+            'type' => 'platoon',
+            'leader_id' => $platoonLeaderTwo->id,
+            'parent_id' => $squad->id,
+        ]);
+
+        $batch = Hierarchy::create([
+            'name' => 'Batch Moving',
+            'type' => 'batch',
+            'leader_id' => $batchLeader->id,
+            'parent_id' => $platoonAlpha->id,
+        ]);
+
+        $team = Hierarchy::create([
+            'name' => 'Team Moving',
+            'type' => 'team',
+            'leader_id' => $teamLeader->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $batchLeader->update(['hierarchy_id' => $batch->id]);
+        $teamLeader->update(['hierarchy_id' => $team->id]);
+
+        User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $team->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.hierarchies.migration.preview', [
+                'source_hierarchy_id' => $batch->id,
+                'destination_parent_id' => $platoonBravo->id,
+            ]))
+            ->assertOk()
+            ->assertSee('Guided horizontal migration')
+            ->assertSee('Batch Moving')
+            ->assertSee('Platoon Bravo')
+            ->assertSee('Team Moving');
+
+        $this->actingAs($admin)
+            ->post(route('admin.hierarchies.migration.execute'), [
+                'source_hierarchy_id' => $batch->id,
+                'destination_parent_id' => $platoonBravo->id,
+            ])
+            ->assertRedirect(route('admin.hierarchies.index'));
+
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $batch->id,
+            'parent_id' => $platoonBravo->id,
+        ]);
+    }
+
+    public function test_admin_can_merge_sibling_groups_with_explicit_source_leader_reassignment(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $batchLeader = User::factory()->create(['role' => User::ROLE_BATCH_LEADER]);
+        $sourceLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+        $targetLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $batch = Hierarchy::create([
+            'name' => 'Batch Merge',
+            'type' => 'batch',
+            'leader_id' => $batchLeader->id,
+        ]);
+
+        $source = Hierarchy::create([
+            'name' => 'Team Source',
+            'type' => 'team',
+            'leader_id' => $sourceLeader->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $target = Hierarchy::create([
+            'name' => 'Team Target',
+            'type' => 'team',
+            'leader_id' => $targetLeader->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $sourceLeader->update(['hierarchy_id' => $source->id]);
+        $targetLeader->update(['hierarchy_id' => $target->id]);
+
+        $member = User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $source->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.hierarchies.merge.preview', [
+                'source_hierarchy_id' => $source->id,
+                'target_hierarchy_id' => $target->id,
+            ]))
+            ->assertOk()
+            ->assertSee('True sibling merge')
+            ->assertSee('Team Source')
+            ->assertSee('Team Target');
+
+        $this->actingAs($admin)
+            ->post(route('admin.hierarchies.merge.execute'), [
+                'source_hierarchy_id' => $source->id,
+                'target_hierarchy_id' => $target->id,
+                'merged_leader_id' => $targetLeader->id,
+                'source_leader_disposition' => 'descendant_team',
+                'source_leader_team_id' => $target->id,
+                'target_leader_disposition' => 'unassign',
+            ])
+            ->assertRedirect(route('admin.hierarchies.index'));
+
+        $this->assertDatabaseMissing('hierarchies', [
+            'id' => $source->id,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $member->id,
+            'hierarchy_id' => $target->id,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $sourceLeader->id,
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $target->id,
+        ]);
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $target->id,
+            'leader_id' => $targetLeader->id,
+        ]);
+    }
+
+    public function test_admin_can_resolve_vacancy_from_dedicated_resolution_page(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $candidate = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $team = Hierarchy::create([
+            'name' => 'Team Resolve',
+            'type' => 'team',
+            'leader_id' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.hierarchies.resolve-vacancy', $team))
+            ->assertOk()
+            ->assertSee('Assign existing leader')
+            ->assertSee('Promote from within');
+
+        $this->actingAs($admin)
+            ->post(route('admin.hierarchies.resolve-vacancy.submit', $team), [
+                'resolution' => 'assign',
+                'leader_id' => $candidate->id,
+            ])
+            ->assertRedirect(route('admin.hierarchies.show', $team));
+
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $team->id,
+            'leader_id' => $candidate->id,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $candidate->id,
+            'hierarchy_id' => $team->id,
+        ]);
+    }
 }

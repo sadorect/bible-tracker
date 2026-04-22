@@ -6,6 +6,7 @@ use App\Models\Message;
 use App\Models\MessageTemplate;
 use App\Models\ReadingPlan;
 use App\Models\User;
+use App\Support\SchemaCapabilities;
 use App\Services\Messaging\MessageCenterService;
 use App\Services\Messaging\MessageVariableRenderer;
 use Illuminate\Http\RedirectResponse;
@@ -27,11 +28,22 @@ class MessageCenterController extends Controller
     {
         $user = $request->user();
         $state = $request->string('state')->toString();
+        $folder = $request->string('folder')->toString() ?: 'inbox';
         $search = trim($request->string('search')->toString());
 
         $query = $user->receivedMessageRecipients()
             ->with(['message.sender', 'message.threadRoot'])
             ->orderByDesc('created_at');
+
+        if (SchemaCapabilities::supportsMessageRecipientFolders()) {
+            $query = match ($folder) {
+                'archive' => $query->whereNull('deleted_at')->whereNotNull('archived_at'),
+                'trash' => $query->whereNotNull('deleted_at'),
+                default => $query->whereNull('deleted_at')->whereNull('archived_at'),
+            };
+        } else {
+            $folder = 'inbox';
+        }
 
         if ($state === 'unread') {
             $query->whereNull('read_at');
@@ -52,13 +64,14 @@ class MessageCenterController extends Controller
         return view('messages.inbox', [
             'layoutComponent' => $this->layoutComponent($user),
             'inboxItems' => $query->paginate(15)->withQueryString(),
-            'filters' => compact('state', 'search'),
+            'filters' => compact('state', 'folder', 'search'),
         ]);
     }
 
     public function sent(Request $request): View
     {
         $user = $request->user();
+        $folder = $request->string('folder')->toString() ?: 'sent';
         $search = trim($request->string('search')->toString());
 
         $query = $user->sentMessages()
@@ -71,6 +84,16 @@ class MessageCenterController extends Controller
             ])
             ->orderByDesc('created_at');
 
+        if (SchemaCapabilities::supportsMessageSenderFolders()) {
+            $query = match ($folder) {
+                'archive' => $query->whereNull('sender_deleted_at')->whereNotNull('sender_archived_at'),
+                'trash' => $query->whereNotNull('sender_deleted_at'),
+                default => $query->whereNull('sender_deleted_at')->whereNull('sender_archived_at'),
+            };
+        } else {
+            $folder = 'sent';
+        }
+
         if ($search !== '') {
             $query->where(function ($scoped) use ($search) {
                 $scoped->where('subject', 'like', "%{$search}%")
@@ -81,7 +104,7 @@ class MessageCenterController extends Controller
         return view('messages.sent', [
             'layoutComponent' => $this->layoutComponent($user),
             'sentItems' => $query->paginate(15)->withQueryString(),
-            'filters' => compact('search'),
+            'filters' => compact('folder', 'search'),
         ]);
     }
 
@@ -228,6 +251,7 @@ class MessageCenterController extends Controller
             ->markAsRead();
 
         $replyRecipients = $this->messageCenter->previewReplyRecipients($user, $threadRoot);
+        $threadState = $this->messageCenter->threadFolderState($user, $threadRoot);
 
         return view('messages.show', [
             'layoutComponent' => $this->layoutComponent($user),
@@ -237,7 +261,46 @@ class MessageCenterController extends Controller
             'replyRecipients' => $replyRecipients,
             'canReply' => $replyRecipients->isNotEmpty() && Gate::allows('reply', $threadRoot),
             'replySubject' => $this->replySubject($threadRoot->subject),
+            'threadMailbox' => $threadState['mailbox'],
+            'threadFolder' => $threadState['folder'],
         ]);
+    }
+
+    public function archive(Request $request, Message $message): RedirectResponse
+    {
+        $threadRoot = $this->threadRoot($message);
+
+        Gate::authorize('view', $threadRoot);
+
+        $this->messageCenter->archiveThread($request->user(), $threadRoot);
+
+        return back()->with('success', 'Conversation archived.');
+    }
+
+    public function trash(Request $request, Message $message): RedirectResponse
+    {
+        $threadRoot = $this->threadRoot($message);
+
+        Gate::authorize('view', $threadRoot);
+
+        $this->messageCenter->trashThread($request->user(), $threadRoot);
+
+        return redirect()->route('messages.'.($request->user()->id === $threadRoot->sender_id ? 'sent' : 'inbox'), [
+            'folder' => 'trash',
+        ])->with('success', 'Conversation moved to trash.');
+    }
+
+    public function restore(Request $request, Message $message): RedirectResponse
+    {
+        $threadRoot = $this->threadRoot($message);
+
+        Gate::authorize('view', $threadRoot);
+
+        $this->messageCenter->restoreThread($request->user(), $threadRoot);
+
+        $folder = $request->user()->id === $threadRoot->sender_id ? 'sent' : 'inbox';
+
+        return redirect()->route('messages.'.$folder)->with('success', 'Conversation restored.');
     }
 
     private function composeView(

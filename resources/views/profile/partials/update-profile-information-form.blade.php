@@ -68,6 +68,39 @@
             <x-input-error class="mt-2" :messages="$errors->get('message_delivery_preference')" />
         </div>
 
+        @if(\App\Support\SchemaCapabilities::supportsNotificationPreferences())
+            <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Alert preferences</h3>
+                    <p class="mt-1 text-sm text-gray-600">Choose how reminders and digests reach you.</p>
+                </div>
+
+                <div class="mt-4 grid gap-4">
+                    @foreach(\App\Models\User::notificationPreferenceGroups() as $group => $label)
+                        <div>
+                            <x-input-label :for="'notification_preferences_'.$group" :value="__($label)" />
+                            <select
+                                id="notification_preferences_{{ $group }}"
+                                name="notification_preferences[{{ $group }}]"
+                                class="mt-1 block w-full rounded-xl border-gray-300"
+                            >
+                                @foreach(\App\Models\User::notificationDeliveryOptions() as $value => $optionLabel)
+                                    <option value="{{ $value }}" {{ old('notification_preferences.'.$group, $user->notificationPreferenceValue($group)) === $value ? 'selected' : '' }}>
+                                        {{ $optionLabel }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <x-input-error class="mt-2" :messages="$errors->get('notification_preferences.'.$group)" />
+                        </div>
+                    @endforeach
+                </div>
+
+                @if($user->canAccessAdminPanel())
+                    <p class="mt-4 text-sm text-gray-500">Admin digests and vacancy alerts always stay in your inbox.</p>
+                @endif
+            </div>
+        @endif
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

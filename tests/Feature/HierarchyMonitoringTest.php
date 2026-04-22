@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\DailyReading;
 use App\Models\Hierarchy;
 use App\Models\ReadingPlan;
+use App\Models\ReadingPlanParticipation;
 use App\Models\ReadingProgress;
+use App\Models\SystemRole;
 use App\Models\TrainingResource;
 use App\Models\User;
 use Carbon\Carbon;
@@ -240,6 +242,150 @@ class HierarchyMonitoringTest extends TestCase
             'id' => $member->id,
             'hierarchy_id' => $teamBravo->id,
         ]);
+    }
+
+    public function test_batch_leader_monitoring_stays_paginated_under_large_member_loads(): void
+    {
+        $batchLeader = User::factory()->create(['role' => User::ROLE_BATCH_LEADER]);
+        $batch = Hierarchy::create([
+            'name' => 'Batch Scale',
+            'type' => 'batch',
+            'leader_id' => $batchLeader->id,
+        ]);
+
+        $batchLeader->update(['hierarchy_id' => $batch->id]);
+
+        $teamAlphaLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+        $teamBravoLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $teamAlpha = Hierarchy::create([
+            'name' => 'Team Alpha',
+            'type' => 'team',
+            'leader_id' => $teamAlphaLeader->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $teamBravo = Hierarchy::create([
+            'name' => 'Team Bravo',
+            'type' => 'team',
+            'leader_id' => $teamBravoLeader->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $teamAlphaLeader->update(['hierarchy_id' => $teamAlpha->id]);
+        $teamBravoLeader->update(['hierarchy_id' => $teamBravo->id]);
+
+        User::factory()->count(40)->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $teamAlpha->id,
+        ]);
+
+        User::factory()->count(40)->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $teamBravo->id,
+        ]);
+
+        $response = $this->actingAs($batchLeader)->get(route('hierarchy.manage', [
+            'per_page' => 50,
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('memberSnapshots', fn ($memberSnapshots) => $memberSnapshots->perPage() === 50
+            && $memberSnapshots->total() === 82
+            && $memberSnapshots->count() === 50);
+        $response->assertSee('Showing 50 of 82 monitored people.');
+    }
+
+    public function test_leader_can_open_member_record_and_participation_drilldowns(): void
+    {
+        $leader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+        $leader->systemRoles()->attach(
+            SystemRole::query()->where('slug', 'reports_admin')->value('id')
+        );
+
+        $team = Hierarchy::create([
+            'name' => 'Team Drilldown',
+            'type' => 'team',
+            'leader_id' => $leader->id,
+        ]);
+
+        $leader->update(['hierarchy_id' => $team->id]);
+
+        $member = User::factory()->create([
+            'name' => 'History Member',
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $team->id,
+        ]);
+
+        $plan = $this->makePlan('Participation Plan', Carbon::yesterday());
+        $readings = $this->makeReadings($plan, 3);
+
+        $participation = ReadingPlanParticipation::create([
+            'user_id' => $member->id,
+            'reading_plan_id' => $plan->id,
+            'participation_number' => 1,
+            'join_source' => ReadingPlanParticipation::SOURCE_DIRECT,
+            'started_on' => Carbon::yesterday(),
+            'status' => ReadingPlanParticipation::STATUS_ACTIVE,
+        ]);
+
+        $member->readingPlans()->attach($plan->id, [
+            ...$this->activePivot(currentDay: 2),
+            'current_participation_id' => $participation->id,
+        ]);
+
+        ReadingProgress::create([
+            'user_id' => $member->id,
+            'reading_plan_id' => $plan->id,
+            'reading_plan_participation_id' => $participation->id,
+            'daily_reading_id' => $readings[0]->id,
+            'completed_date' => Carbon::today(),
+        ]);
+
+        $this->actingAs($leader)
+            ->get(route('hierarchy.members.show', $member))
+            ->assertOk()
+            ->assertSee('History Member')
+            ->assertSee('Cycle-by-cycle drilldown')
+            ->assertSee('Open scoped report')
+            ->assertSee('Participation Plan');
+
+        $this->actingAs($leader)
+            ->get(route('hierarchy.members.participations.show', [$member, $participation]))
+            ->assertOk()
+            ->assertSee('Participation Drilldown')
+            ->assertSee('Participation Plan')
+            ->assertSee('Completed days');
+    }
+
+    public function test_leader_cannot_open_member_record_outside_their_scope(): void
+    {
+        $leader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+        $otherLeader = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $teamAlpha = Hierarchy::create([
+            'name' => 'Team Alpha',
+            'type' => 'team',
+            'leader_id' => $leader->id,
+        ]);
+
+        $teamBravo = Hierarchy::create([
+            'name' => 'Team Bravo',
+            'type' => 'team',
+            'leader_id' => $otherLeader->id,
+        ]);
+
+        $leader->update(['hierarchy_id' => $teamAlpha->id]);
+        $otherLeader->update(['hierarchy_id' => $teamBravo->id]);
+
+        $member = User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $teamBravo->id,
+        ]);
+
+        $this->actingAs($leader)
+            ->get(route('hierarchy.members.show', $member))
+            ->assertForbidden();
     }
 
     public function test_team_leader_cannot_reassign_members_outside_their_team_scope(): void

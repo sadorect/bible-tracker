@@ -115,4 +115,34 @@ class Hierarchy extends Model
 
         return $segments->implode(' / ');
     }
+
+    public static function buildDisplayPaths(Collection $hierarchies): Collection
+    {
+        $namesById = $hierarchies->pluck('name', 'id');
+        $parentsById = $hierarchies->pluck('parent_id', 'id');
+        $paths = collect();
+
+        $resolvePath = function (?int $hierarchyId) use (&$resolvePath, $namesById, $parentsById, $paths): string {
+            if (! $hierarchyId || ! isset($namesById[$hierarchyId])) {
+                return '';
+            }
+
+            if ($paths->has($hierarchyId)) {
+                return $paths->get($hierarchyId);
+            }
+
+            $parentId = $parentsById[$hierarchyId] ?? null;
+            $path = $parentId && isset($namesById[$parentId])
+                ? $resolvePath($parentId).' / '.$namesById[$hierarchyId]
+                : $namesById[$hierarchyId];
+
+            $paths->put($hierarchyId, $path);
+
+            return $path;
+        };
+
+        $hierarchies->each(fn (Hierarchy $hierarchy) => $resolvePath($hierarchy->id));
+
+        return $paths;
+    }
 }

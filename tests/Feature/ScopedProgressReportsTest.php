@@ -81,6 +81,46 @@ class ScopedProgressReportsTest extends TestCase
         ]);
     }
 
+    public function test_scoped_progress_index_stays_paginated_with_large_result_sets(): void
+    {
+        [$leader, , , $plan] = $this->seedScopedReportScenario();
+
+        $reading = DailyReading::query()->where('reading_plan_id', $plan->id)->firstOrFail();
+        $teamAlphaId = $leader->hierarchy_id;
+
+        $extraMembers = User::factory()->count(60)->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $teamAlphaId,
+        ]);
+
+        foreach ($extraMembers as $member) {
+            $member->readingPlans()->attach($plan->id, [
+                'joined_date' => now()->subDays(2),
+                'current_day' => 1,
+                'current_streak' => 1,
+                'completion_rate' => 100,
+                'is_active' => true,
+            ]);
+
+            ReadingProgress::create([
+                'user_id' => $member->id,
+                'reading_plan_id' => $plan->id,
+                'daily_reading_id' => $reading->id,
+                'completed_date' => now()->subDay(),
+            ]);
+        }
+
+        $response = $this->actingAs($leader)->get(route('admin.progress.index', [
+            'per_page' => 50,
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('progress', fn ($progress) => $progress->perPage() === 50
+            && $progress->total() === 61
+            && $progress->count() === 50);
+        $response->assertSee('Showing 50 of 61 matching entries.');
+    }
+
     public function test_leader_hierarchy_summary_export_only_contains_branch_groups(): void
     {
         [$leader, , , $plan] = $this->seedScopedReportScenario();

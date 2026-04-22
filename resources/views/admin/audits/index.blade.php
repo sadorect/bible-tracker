@@ -62,9 +62,30 @@
                 <div class="flex items-end gap-3 lg:col-span-5">
                     <button type="submit" class="inline-flex rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition hover:bg-slate-800">Apply filters</button>
                     <a href="{{ route('admin.audits.index') }}" class="inline-flex rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900">Reset</a>
+                    <a href="{{ route('admin.audits.export', request()->query()) }}" class="inline-flex rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900">Export CSV</a>
                 </div>
             </form>
         </section>
+
+        @if($eventSummary->isNotEmpty())
+            <section class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Most frequent events</h2>
+                        <p class="mt-1 text-sm text-slate-500">Top activity within the current filter window.</p>
+                    </div>
+                </div>
+                <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    @foreach($eventSummary as $summary)
+                        <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ str($summary->event)->replace('.', ' ')->headline() }}</p>
+                            <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($summary->total) }}</p>
+                            <p class="mt-2 text-xs text-slate-500">{{ $summary->event }}</p>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
 
         <section class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
             <div class="border-b border-slate-200 px-6 py-5">

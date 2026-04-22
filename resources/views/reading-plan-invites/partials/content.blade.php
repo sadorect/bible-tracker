@@ -74,4 +74,22 @@
             @endif
         </div>
     </div>
+
+    <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">After you join</p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-[1.35rem] bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <p class="font-semibold text-slate-900">1. Confirm access</p>
+                <p class="mt-2">The cohort is added to your profile right away.</p>
+            </div>
+            <div class="rounded-[1.35rem] bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <p class="font-semibold text-slate-900">2. Finish training</p>
+                <p class="mt-2">Complete any training items before reading opens.</p>
+            </div>
+            <div class="rounded-[1.35rem] bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <p class="font-semibold text-slate-900">3. Start reading</p>
+                <p class="mt-2">Use your dashboard to record each day as the cohort advances.</p>
+            </div>
+        </div>
+    </div>
 </div>

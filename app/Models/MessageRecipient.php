@@ -30,6 +30,8 @@ class MessageRecipient extends Model
         'emailed_at',
         'email_failure',
         'read_at',
+        'archived_at',
+        'deleted_at',
     ];
 
     protected $casts = [
@@ -37,6 +39,8 @@ class MessageRecipient extends Model
         'email_attempted_at' => 'datetime',
         'emailed_at' => 'datetime',
         'read_at' => 'datetime',
+        'archived_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function message(): BelongsTo

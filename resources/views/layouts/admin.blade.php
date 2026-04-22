@@ -7,11 +7,6 @@
 
     <title>{{ config('app.name', 'Bible Reading Tracker') }} · Admin</title>
 
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>[x-cloak]{display:none !important;}</style>
 </head>
@@ -19,7 +14,7 @@
 @php($unreadInboxCount = $user?->unreadInboxCount() ?? 0)
 @php($unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0)
 <body
-    class="bg-slate-100 font-['Instrument_Sans'] text-slate-900 antialiased"
+    class="bg-slate-100 font-sans text-slate-900 antialiased"
     x-data="{
         sidebarOpen: false,
         sidebarCollapsed: JSON.parse(localStorage.getItem('admin-sidebar-collapsed') ?? 'false'),
@@ -133,6 +128,11 @@
                             </span>
                             <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Alerts</span>
                         </a>
+                        <a href="{{ route('manual.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('manual.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-book w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Manual</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Guide</span>
+                        </a>
                         <a href="{{ route('messages.inbox') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('messages.inbox') || request()->routeIs('messages.index') || request()->routeIs('messages.sent') || request()->routeIs('messages.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
                             <i class="fas fa-inbox w-5 text-center flex-shrink-0"></i>
                             <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms class="flex items-center gap-2">
@@ -202,10 +202,13 @@
                                 <span class="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadNotificationCount }}</span>
                             @endif
                         </a>
+                        <a href="{{ route('manual.index') }}" class="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex">
+                            Manual
+                        </a>
 
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-slate-300">
-                                <img class="h-10 w-10 rounded-2xl object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=020617&color=fff" alt="User avatar">
+                                <x-user-avatar :name="$user->name" class="h-10 w-10 rounded-2xl bg-slate-950 text-white" />
                                 <div class="hidden text-left sm:block">
                                     <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
                                     <p class="text-xs text-slate-500">Administrator</p>
@@ -221,6 +224,10 @@
                                 <a href="{{ route('notifications.index') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                     <i class="fas fa-bell w-4 text-center text-slate-400"></i>
                                     Alerts
+                                </a>
+                                <a href="{{ route('manual.index') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                                    <i class="fas fa-book w-4 text-center text-slate-400"></i>
+                                    User manual
                                 </a>
                                 <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                     <i class="fas fa-house w-4 text-center text-slate-400"></i>

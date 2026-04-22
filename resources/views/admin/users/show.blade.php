@@ -10,7 +10,7 @@
         <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-sky-700 text-white shadow-2xl shadow-slate-900/15">
             <div class="grid gap-6 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:px-10">
                 <div class="flex items-start gap-4">
-                    <img class="h-16 w-16 rounded-[1.5rem] object-cover" src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=ffffff&color=0f172a" alt="{{ $user->name }}">
+                    <x-user-avatar :name="$user->name" class="h-16 w-16 rounded-[1.5rem] bg-white text-slate-900 text-lg" />
                     <div>
                         <span class="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-100">
                             {{ $user->roleLabel() }}

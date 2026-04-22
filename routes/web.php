@@ -14,9 +14,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MessageCenterController;
 use App\Http\Controllers\NotificationCenterController;
 use App\Http\Controllers\LeaderHierarchyController;
+use App\Http\Controllers\LeaderMemberRecordController;
 use App\Http\Controllers\ReadingPlanInviteController;
 use App\Http\Controllers\ReadingPlanController;
 use App\Http\Controllers\ReadingProgressController;
+use App\Http\Controllers\UserManualController;
 use App\Http\Middleware\Admin;
 use App\Livewire\ReadingHistory;
 use Illuminate\Support\Facades\Auth;
@@ -42,6 +44,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reading-progress', [ReadingProgressController::class, 'index'])->name('reading.progress');
     Route::get('/hierarchy/manage', [DashboardController::class, 'manageHierarchy'])->name('hierarchy.manage');
     Route::post('/hierarchy/manage/member/{member}', [DashboardController::class, 'updateManagedMember'])->name('hierarchy.members.update');
+    Route::get('/hierarchy/manage/member/{member}', [LeaderMemberRecordController::class, 'show'])->name('hierarchy.members.show');
+    Route::get('/hierarchy/manage/member/{member}/participations/{participation}', [LeaderMemberRecordController::class, 'participation'])->name('hierarchy.members.participations.show');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -63,10 +67,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/messages/compose', [MessageCenterController::class, 'compose'])->name('messages.compose');
     Route::post('/messages/compose/preview', [MessageCenterController::class, 'preview'])->name('messages.preview');
     Route::post('/messages', [MessageCenterController::class, 'store'])->name('messages.store');
+    Route::patch('/messages/{message}/archive', [MessageCenterController::class, 'archive'])->name('messages.archive');
+    Route::patch('/messages/{message}/trash', [MessageCenterController::class, 'trash'])->name('messages.trash');
+    Route::patch('/messages/{message}/restore', [MessageCenterController::class, 'restore'])->name('messages.restore');
     Route::get('/messages/{message}', [MessageCenterController::class, 'show'])->name('messages.show');
     Route::get('/notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationCenterController::class, 'markAllAsRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationCenterController::class, 'markAsRead'])->name('notifications.read');
+    Route::get('/manual', [UserManualController::class, 'index'])->name('manual.index');
+    Route::get('/manual/{guide}', [UserManualController::class, 'show'])->name('manual.show');
     Route::post('/enroll/{token}/accept', [ReadingPlanInviteController::class, 'accept'])->name('reading-plan-invites.accept');
 
     // Leader hierarchy tree — scoped to the leader's own branch
@@ -84,6 +93,12 @@ Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->grou
 
     Route::get('hierarchies', [AdminHierarchyController::class, 'index'])->middleware('can:hierarchies.manage')->name('hierarchies.index');
     Route::get('hierarchies/tree', [AdminHierarchyController::class, 'tree'])->middleware('can:hierarchies.manage')->name('hierarchies.tree');
+    Route::get('hierarchies/{hierarchy}/resolve-vacancy', [AdminHierarchyController::class, 'showVacancyResolution'])->middleware('can:hierarchies.manage')->name('hierarchies.resolve-vacancy');
+    Route::post('hierarchies/{hierarchy}/resolve-vacancy', [AdminHierarchyController::class, 'resolveVacancy'])->middleware('can:hierarchies.manage')->name('hierarchies.resolve-vacancy.submit');
+    Route::get('hierarchies/workflows/migration/preview', [AdminHierarchyController::class, 'previewMigration'])->middleware('can:hierarchies.manage')->name('hierarchies.migration.preview');
+    Route::post('hierarchies/workflows/migration', [AdminHierarchyController::class, 'executeMigration'])->middleware('can:hierarchies.manage')->name('hierarchies.migration.execute');
+    Route::get('hierarchies/workflows/merge/preview', [AdminHierarchyController::class, 'previewMerge'])->middleware('can:hierarchies.manage')->name('hierarchies.merge.preview');
+    Route::post('hierarchies/workflows/merge', [AdminHierarchyController::class, 'executeMerge'])->middleware('can:hierarchies.manage')->name('hierarchies.merge.execute');
     Route::post('hierarchies', [AdminHierarchyController::class, 'store'])->middleware('can:hierarchies.manage')->name('hierarchies.store');
     Route::put('hierarchies/{hierarchy}', [AdminHierarchyController::class, 'update'])->middleware('can:hierarchies.manage')->name('hierarchies.update');
     Route::post('hierarchies/{hierarchy}/promote-leader', [AdminHierarchyController::class, 'promoteLeader'])->middleware('can:hierarchies.manage')->name('hierarchies.promote-leader');
@@ -98,6 +113,7 @@ Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->grou
     Route::post('progress/presets', [UserProgressController::class, 'storePreset'])->middleware('can:progress.view')->name('progress.presets.store');
     Route::delete('progress/presets/{reportPreset}', [UserProgressController::class, 'destroyPreset'])->middleware('can:progress.view')->name('progress.presets.destroy');
     Route::get('audits', [AdminAuditLogController::class, 'index'])->middleware('can:audits.view')->name('audits.index');
+    Route::get('audits/export', [AdminAuditLogController::class, 'export'])->middleware('can:audits.view')->name('audits.export');
     Route::get('automation', [AdminAutomationController::class, 'index'])->middleware('can:automation.manage')->name('automation.index');
     Route::put('automation', [AdminAutomationController::class, 'update'])->middleware('can:automation.manage')->name('automation.update');
     Route::post('automation/run-now', [AdminAutomationController::class, 'runNow'])->middleware('can:automation.manage')->name('automation.run-now');

@@ -41,6 +41,15 @@
                             </div>
                             <h3 class="mt-3 text-lg font-semibold text-slate-900">{{ $data['title'] ?? 'Notification' }}</h3>
                             <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ $data['body'] ?? '' }}</p>
+                            @if(($data['category'] ?? null) === 'vacancy_alert' && !empty($data['vacancies']))
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach($data['vacancies'] as $vacancy)
+                                        <a href="{{ $vacancy['resolve_url'] ?? '#' }}" class="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100">
+                                            Resolve {{ $vacancy['path'] ?? 'vacancy' }}
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
                             <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                                 <span>{{ $notification->created_at->format('M j, Y g:i A') }}</span>
                                 @if(!empty($data['action_url']) && !empty($data['action_label']))

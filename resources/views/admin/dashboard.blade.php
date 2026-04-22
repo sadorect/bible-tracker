@@ -209,11 +209,7 @@
                     @forelse($recentActivity as $activity)
                         <div class="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div class="flex items-center gap-3">
-                                <img
-                                    class="h-11 w-11 rounded-2xl object-cover"
-                                    src="https://ui-avatars.com/api/?name={{ urlencode($activity->user->name) }}&background=0f172a&color=fff"
-                                    alt="{{ $activity->user->name }}"
-                                >
+                                <x-user-avatar :name="$activity->user->name" class="h-11 w-11 rounded-2xl bg-slate-900 text-white" />
                                 <div>
                                     <p class="text-sm font-semibold text-slate-900">{{ $activity->user->name }}</p>
                                     <p class="text-xs text-slate-500">{{ $activity->dailyReading->readingPlan->name ?? 'Unknown Plan' }}</p>

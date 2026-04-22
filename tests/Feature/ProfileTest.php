@@ -61,6 +61,28 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_profile_can_store_notification_preferences(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'notification_preferences' => [
+                    'reminders' => User::MESSAGE_DELIVERY_INBOX,
+                    'leader_digest' => User::NOTIFICATION_DELIVERY_OFF,
+                    'admin_digest' => User::NOTIFICATION_DELIVERY_DEFAULT,
+                    'vacancy_alert' => User::MESSAGE_DELIVERY_BOTH,
+                ],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $this->assertSame(User::MESSAGE_DELIVERY_INBOX, data_get($user->fresh()->notification_preferences, 'reminders'));
+        $this->assertSame(User::NOTIFICATION_DELIVERY_OFF, data_get($user->fresh()->notification_preferences, 'leader_digest'));
+    }
+
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();

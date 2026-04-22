@@ -41,6 +41,33 @@
         </div>
     </section>
 
+    @if($participationSummary)
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article class="rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-900/5">
+                <p class="text-sm text-slate-500">Current cycle</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">#{{ $participationSummary['cycle_number'] ?? 1 }}</p>
+            </article>
+            <article class="rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-900/5">
+                <p class="text-sm text-slate-500">Completion rate</p>
+                <p class="mt-3 text-3xl font-semibold text-slate-900">{{ $participationSummary['completion_rate'] }}%</p>
+            </article>
+            <article class="rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-900/5">
+                <p class="text-sm text-slate-500">Last completion</p>
+                <p class="mt-3 text-lg font-semibold text-slate-900">{{ $participationSummary['last_completed_on'] ? \Carbon\Carbon::parse($participationSummary['last_completed_on'])->format('M d, Y') : 'None yet' }}</p>
+            </article>
+            <article class="rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-900/5">
+                <p class="text-sm text-slate-500">Best prior cycle</p>
+                <p class="mt-3 text-lg font-semibold text-slate-900">
+                    @if($participationSummary['best_cycle'])
+                        #{{ $participationSummary['best_cycle']['cycle_number'] }} · {{ $participationSummary['best_cycle']['completed_days'] }} days
+                    @else
+                        None yet
+                    @endif
+                </p>
+            </article>
+        </section>
+    @endif
+
     <section class="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <div class="rounded-[2rem] bg-white shadow-xl shadow-slate-900/5">
             <div class="border-b border-stone-200 px-6 py-5">

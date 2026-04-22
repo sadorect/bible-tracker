@@ -87,6 +87,18 @@
                     </label>
 
                     <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Group</span>
+                        <select name="hierarchy_id" id="hierarchy_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">All groups</option>
+                            @foreach($hierarchies as $hierarchy)
+                                <option value="{{ $hierarchy->id }}" {{ (string) request('hierarchy_id') === (string) $hierarchy->id ? 'selected' : '' }}>
+                                    {{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block">
                         <span class="text-sm font-medium text-slate-700">Rows per page</span>
                         <select name="per_page" id="per_page" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                             @foreach($allowedPerPage as $pageSize)
@@ -123,12 +135,20 @@
                             <option value="assign_plan">Assign reading plan</option>
                             <option value="remove_plan">Remove reading plan</option>
                             <option value="change_role">Change role</option>
+                            <option value="promote_current_assignment">Promote into current vacancy</option>
+                            <option value="demote_from_leadership">Demote from leadership safely</option>
                             <option value="assign_hierarchy">Assign group</option>
                             <option value="distribute_evenly">Distribute across teams evenly</option>
                             <option value="clear_hierarchy">Clear group</option>
                             <option value="delete">Delete users</option>
                         </select>
                     </label>
+
+                    @if($prefillTargetTeamIds !== [] && $prefillSourceTeam)
+                        <div class="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                            Rebalance suggestion: select about {{ $prefillSuggestedMoveCount }} member(s) from {{ $prefillSourceTeam->name }} and distribute them across the preselected sibling teams below.
+                        </div>
+                    @endif
 
                     <div id="reading-plan-select" class="hidden">
                         <label class="block">
@@ -148,10 +168,10 @@
                             <select name="role" id="bulk-role" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                                 <option value="">Select role</option>
                                 @foreach($stats['roles'] as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </label>
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
                     </div>
 
                     <div id="hierarchy-select" class="hidden">
@@ -160,7 +180,7 @@
                             <select name="hierarchy_id" id="bulk-hierarchy" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                                 <option value="">Select group</option>
                                 @foreach($hierarchies as $hierarchy)
-                                    <option value="{{ $hierarchy->id }}">{{ $hierarchy->displayPath() }}</option>
+                                    <option value="{{ $hierarchy->id }}">{{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -171,7 +191,7 @@
                             <span class="text-sm font-medium text-slate-700">Target teams</span>
                             <select name="target_team_ids[]" id="bulk-target-teams" multiple class="mt-2 min-h-36 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                                 @foreach($hierarchies->where('type', 'team') as $hierarchy)
-                                    <option value="{{ $hierarchy->id }}">{{ $hierarchy->displayPath() }}</option>
+                                    <option value="{{ $hierarchy->id }}" {{ in_array($hierarchy->id, $prefillTargetTeamIds, true) ? 'selected' : '' }}>{{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }}</option>
                                 @endforeach
                             </select>
                             <p class="mt-2 text-xs text-slate-500">Choose at least two teams from the same batch. Selected members will be placed into the lightest-loaded team first.</p>
@@ -281,11 +301,7 @@
                                 </td>
                                 <td class="px-6 py-5">
                                     <div class="flex items-center gap-4">
-                                        <img
-                                            class="h-11 w-11 rounded-2xl object-cover"
-                                            src="https://ui-avatars.com/api/?name={{ urlencode($user->name) }}&background=0f172a&color=fff"
-                                            alt="{{ $user->name }}"
-                                        >
+                                        <x-user-avatar :name="$user->name" class="h-11 w-11 rounded-2xl bg-slate-900 text-white" />
                                         <div>
                                             <p class="text-sm font-semibold text-slate-900">{{ $user->name }}</p>
                                             <p class="text-sm text-slate-500">{{ $user->email }}</p>
@@ -309,7 +325,7 @@
                                 </td>
                                 <td class="px-6 py-5" data-column="group">
                                     @if($user->hierarchy)
-                                        <div title="{{ $user->hierarchy->displayPath() }}">
+                                        <div title="{{ $hierarchyDisplayPaths[$user->hierarchy_id] ?? $user->hierarchy->name }}">
                                             <p class="text-sm font-medium text-slate-900">{{ $user->hierarchy->name }}</p>
                                             <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{{ $user->hierarchy->type }}</p>
                                         </div>
@@ -339,7 +355,7 @@
                                         <a href="{{ route('admin.users.edit', $user) }}" class="inline-flex rounded-full bg-sky-100 px-3 py-1.5 text-sky-700 transition hover:bg-sky-200">
                                             Edit
                                         </a>
-                                        @if($user->role !== 'admin' || \App\Models\User::where('role', 'admin')->count() > 1)
+                                        @if($user->role !== 'admin' || $multipleLegacyAdmins)
                                             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline" onsubmit="return confirm('Are you sure you want to delete this user?')">
                                                 @csrf
                                                 @method('DELETE')
@@ -433,6 +449,8 @@
                     actionReady = hierarchyValue.length > 0;
                 } else if (action === 'distribute_evenly') {
                     actionReady = targetTeamsValue.length >= 2;
+                } else if (action === 'promote_current_assignment' || action === 'demote_from_leadership') {
+                    actionReady = true;
                 }
 
                 bulkSubmit.disabled = !(selectedCount > 0 && actionReady);
@@ -475,6 +493,16 @@
                     this.appendChild(input);
                 });
             });
+
+            (() => {
+                const initialAction = @json(request('action'));
+
+                if (initialAction) {
+                    document.getElementById('bulk-action').value = initialAction;
+                }
+
+                document.getElementById('bulk-action').dispatchEvent(new Event('change'));
+            })();
 
         </script>
     @endpush

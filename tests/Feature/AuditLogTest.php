@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\BibleChapter;
 use App\Models\DailyReading;
 use App\Models\Hierarchy;
+use App\Models\MessageTemplate;
 use App\Models\ReadingPlan;
 use App\Models\ReadingPlanInvite;
 use App\Models\ReadingProgress;
@@ -231,6 +232,141 @@ class AuditLogTest extends TestCase
         $this->assertSame('csv', $auditLog->metadata['format']);
         $this->assertSame('detail', $auditLog->metadata['report_type']);
         $this->assertSame('Reporting scope: Team Alpha', $auditLog->metadata['scope_label']);
+    }
+
+    public function test_horizontal_migration_and_sibling_merge_are_logged(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+        ]);
+
+        $squadLeader = User::factory()->create(['role' => User::ROLE_SQUAD_LEADER]);
+        $platoonLeaderOne = User::factory()->create(['role' => User::ROLE_PLATOON_LEADER]);
+        $platoonLeaderTwo = User::factory()->create(['role' => User::ROLE_PLATOON_LEADER]);
+        $batchLeader = User::factory()->create(['role' => User::ROLE_BATCH_LEADER]);
+        $teamLeaderOne = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+        $teamLeaderTwo = User::factory()->create(['role' => User::ROLE_TEAM_LEADER]);
+
+        $squad = Hierarchy::create([
+            'name' => 'Audit Squad',
+            'type' => 'squad',
+            'leader_id' => $squadLeader->id,
+        ]);
+
+        $platoonOne = Hierarchy::create([
+            'name' => 'Audit Platoon One',
+            'type' => 'platoon',
+            'leader_id' => $platoonLeaderOne->id,
+            'parent_id' => $squad->id,
+        ]);
+
+        $platoonTwo = Hierarchy::create([
+            'name' => 'Audit Platoon Two',
+            'type' => 'platoon',
+            'leader_id' => $platoonLeaderTwo->id,
+            'parent_id' => $squad->id,
+        ]);
+
+        $batch = Hierarchy::create([
+            'name' => 'Audit Batch',
+            'type' => 'batch',
+            'leader_id' => $batchLeader->id,
+            'parent_id' => $platoonOne->id,
+        ]);
+
+        $teamSource = Hierarchy::create([
+            'name' => 'Audit Team Source',
+            'type' => 'team',
+            'leader_id' => $teamLeaderOne->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $teamTarget = Hierarchy::create([
+            'name' => 'Audit Team Target',
+            'type' => 'team',
+            'leader_id' => $teamLeaderTwo->id,
+            'parent_id' => $batch->id,
+        ]);
+
+        $batchLeader->update(['hierarchy_id' => $batch->id]);
+        $teamLeaderOne->update(['hierarchy_id' => $teamSource->id]);
+        $teamLeaderTwo->update(['hierarchy_id' => $teamTarget->id]);
+
+        User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => $teamSource->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.hierarchies.migration.execute'), [
+                'source_hierarchy_id' => $batch->id,
+                'destination_parent_id' => $platoonTwo->id,
+            ])
+            ->assertRedirect(route('admin.hierarchies.index'));
+
+        $this->actingAs($admin)
+            ->post(route('admin.hierarchies.merge.execute'), [
+                'source_hierarchy_id' => $teamSource->id,
+                'target_hierarchy_id' => $teamTarget->id,
+                'merged_leader_id' => $teamLeaderTwo->id,
+                'source_leader_disposition' => 'descendant_team',
+                'source_leader_team_id' => $teamTarget->id,
+            ])
+            ->assertRedirect(route('admin.hierarchies.index'));
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'hierarchy.branch_migrated',
+            'actor_id' => $admin->id,
+            'subject_type' => Hierarchy::class,
+            'subject_id' => $batch->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'hierarchy.sibling_merged',
+            'actor_id' => $admin->id,
+            'subject_type' => Hierarchy::class,
+            'subject_id' => $teamTarget->id,
+        ]);
+    }
+
+    public function test_message_settings_and_template_changes_are_logged_and_audit_export_is_available(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.messages.settings.update'), [
+                'default_delivery' => User::MESSAGE_DELIVERY_INBOX,
+                'email_enabled' => 1,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->post(route('admin.messages.templates.store'), [
+                'name' => 'Ops Alert',
+                'subject_template' => 'Hello {{ user.name }}',
+                'body_template' => 'Please review the update.',
+                'is_active' => 1,
+            ])
+            ->assertRedirect();
+
+        $template = MessageTemplate::query()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('admin.audits.export'))
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'messages.settings_updated',
+            'actor_id' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'messages.template_created',
+            'actor_id' => $admin->id,
+            'subject_type' => MessageTemplate::class,
+            'subject_id' => $template->id,
+        ]);
     }
 
     private function seedNewTestamentChapters(): void

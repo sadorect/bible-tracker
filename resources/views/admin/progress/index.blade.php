@@ -66,7 +66,7 @@
                         <option value="">All groups</option>
                         @foreach($hierarchies as $hierarchy)
                             <option value="{{ $hierarchy->id }}" {{ (int) $filters['hierarchy_id'] === (int) $hierarchy->id ? 'selected' : '' }}>
-                                {{ $hierarchy->displayPath() }}
+                                {{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }}
                             </option>
                         @endforeach
                     </select>
@@ -113,6 +113,15 @@
                         <option value="this_month" {{ $filters['date_range'] == 'this_month' ? 'selected' : '' }}>This month</option>
                         <option value="last_month" {{ $filters['date_range'] == 'last_month' ? 'selected' : '' }}>Last month</option>
                         <option value="custom" {{ $filters['date_range'] == 'custom' ? 'selected' : '' }}>Custom range</option>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-slate-700">Rows per page</span>
+                    <select name="per_page" id="per_page" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @foreach($allowedPerPage as $pageSize)
+                            <option value="{{ $pageSize }}" {{ (int) $filters['per_page'] === $pageSize ? 'selected' : '' }}>{{ $pageSize }}</option>
+                        @endforeach
                     </select>
                 </label>
 
@@ -282,6 +291,7 @@
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Latest entries</p>
                     <h2 class="mt-2 text-2xl font-semibold text-slate-900">Recent reading progress</h2>
+                    <p class="mt-2 text-sm text-slate-500">Showing {{ $progress->count() }} of {{ $progress->total() }} matching entries.</p>
                 </div>
                 <details class="relative">
                     <summary class="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900">
@@ -348,7 +358,7 @@
                                 <td class="px-6 py-5 text-sm text-slate-600" data-column="reading">{{ $record->dailyReading->reading_range }}</td>
                                 <td class="px-6 py-5 text-sm text-slate-500" data-column="completed-date">{{ \Carbon\Carbon::parse($record->completed_date)->format('M d, Y g:i A') }}</td>
                                 <td class="px-6 py-5 text-sm text-slate-500">
-                                    {{ $record->user->hierarchy?->displayPath() ?? 'Unassigned' }}
+                                    {{ $hierarchyDisplayPaths[$record->user->hierarchy_id] ?? 'Unassigned' }}
                                 </td>
                                 <td class="px-6 py-5">
                                     <div class="flex flex-wrap gap-2 text-sm font-medium">
@@ -379,7 +389,6 @@
     </div>
 
     @push('scripts')
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
             document.getElementById('date_range').addEventListener('change', function() {
                 const customDateRange = document.getElementById('custom_date_range');

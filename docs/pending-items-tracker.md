@@ -13,7 +13,7 @@ This document tracks the remaining product, operational, and documentation work 
 ### P1: High-Value Product And Operations Work
 
 #### 1. Guided Horizontal Migration Workflow
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P1
 - Why it matters: Same-level movement is possible today by changing `parent_id`, but there is no guided workflow for safely relocating an entire team, batch, platoon, or squad.
 - Desired outcome:
@@ -26,7 +26,7 @@ This document tracks the remaining product, operational, and documentation work 
   - it should not allow invalid vertical-level restructuring
 
 #### 2. True Sibling Merge Workflow
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P1
 - Why it matters: Teams and other sibling groups can be manually consolidated today, but there is no first-class merge operation.
 - Desired outcome:
@@ -39,7 +39,7 @@ This document tracks the remaining product, operational, and documentation work 
   - merge should include a review/confirmation step
 
 #### 3. Leader-Scoped Detailed Record Drilldowns
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P1
 - Why it matters: Leaders can already monitor and report on their tree, but there is still room for deeper descendant-level record views in a more leader-native workflow.
 - Desired outcome:
@@ -50,7 +50,7 @@ This document tracks the remaining product, operational, and documentation work 
 ### P2: Workflow And Administration Polish
 
 #### 4. Bulk Promote/Demote From User Directory
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P2
 - Why it matters: Promotion and demotion now exist on the hierarchy screen, but not yet from the broader user operations flow.
 - Desired outcome:
@@ -58,7 +58,7 @@ This document tracks the remaining product, operational, and documentation work 
   - enforce hierarchy-role alignment and vacancy safety checks
 
 #### 5. Vacancy Resolution UX
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P2
 - Why it matters: Vacancy alerts now exist, but resolution still requires navigating manually into hierarchy screens.
 - Desired outcome:
@@ -66,7 +66,7 @@ This document tracks the remaining product, operational, and documentation work 
   - one-step “assign or promote leader” flow from vacancy context
 
 #### 6. Balance Insights To Action
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P2
 - Why it matters: The hierarchy screen can now highlight uneven sibling teams, but those insights do not yet prefill a balancing action.
 - Desired outcome:
@@ -77,7 +77,7 @@ This document tracks the remaining product, operational, and documentation work 
 ### P3: Plan And Participant Experience Refinement
 
 #### 7. Recruitment Presentation Polish
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: Recruitable plans are visible, but the member onboarding and recruitment discovery flow can still feel more intentional.
 - Desired outcome:
@@ -86,7 +86,7 @@ This document tracks the remaining product, operational, and documentation work 
   - cleaner distinction between current opportunities and history
 
 #### 8. Cohort Recommendation Logic
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: When multiple NT and OT cohorts are available, the UI does not yet strongly recommend which one a participant should choose.
 - Desired outcome:
@@ -95,7 +95,7 @@ This document tracks the remaining product, operational, and documentation work 
   - preserve flexibility for users to pick another eligible active cohort
 
 #### 9. Participation History Refinement
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: Repeat participation is supported, but cycle history can still be presented more clearly.
 - Desired outcome:
@@ -106,7 +106,7 @@ This document tracks the remaining product, operational, and documentation work 
 ### P3: Messaging, Notification, And Governance Expansion
 
 #### 10. Notification Preference Depth
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: Automation notifications respect inbox/email broadly, but there is no per-category preference control.
 - Desired outcome:
@@ -114,7 +114,7 @@ This document tracks the remaining product, operational, and documentation work 
   - clear admin override behavior where appropriate
 
 #### 11. Message Centre Expansion
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: The message center covers the core v1 workflow, but archive, trash, and search are still absent.
 - Desired outcome:
@@ -123,7 +123,7 @@ This document tracks the remaining product, operational, and documentation work 
   - search and filtering improvements
 
 #### 12. Audit Coverage Expansion
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P3
 - Why it matters: High-value actions are logged now, but full operational visibility will require broader coverage.
 - Desired outcome:
@@ -133,7 +133,7 @@ This document tracks the remaining product, operational, and documentation work 
 ### P4: Performance And Stability Work
 
 #### 13. Query Optimization Pass
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P4
 - Why it matters: The app is now functionally broad, and the heaviest dashboards/reports/hierarchy flows would benefit from a deliberate performance pass.
 - Desired outcome:
@@ -142,7 +142,7 @@ This document tracks the remaining product, operational, and documentation work 
   - keep large seeded datasets responsive
 
 #### 14. Large-Volume Workflow Review
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P4
 - Why it matters: The seeders now support high user counts, but the team has not yet done a deliberate operational UX review at that scale.
 - Desired outcome:
@@ -152,7 +152,7 @@ This document tracks the remaining product, operational, and documentation work 
 ## Documentation Backlog
 
 ### 15. Comprehensive User Manual With Workflow Diagrams
-- Status: Pending
+- Status: Completed (2026-04-22)
 - Priority: P1
 - Why it matters: The app has grown into a multi-role operational platform. A proper manual is now needed for onboarding admins, leaders, and members without relying on tribal knowledge.
 - Deliverable scope:
@@ -182,6 +182,8 @@ This document tracks the remaining product, operational, and documentation work 
   - Markdown manual in `docs/`
   - Mermaid diagrams embedded where helpful
   - sectioned so it can later be split into role-based mini guides
+- Deliverable:
+  - `docs/user-manual.md`
 
 ## Suggested Execution Order
 

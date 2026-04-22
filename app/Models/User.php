@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SchemaCapabilities;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -33,6 +34,10 @@ class User extends Authenticatable
 
     public const MESSAGE_DELIVERY_BOTH = 'both';
 
+    public const NOTIFICATION_DELIVERY_DEFAULT = 'default';
+
+    public const NOTIFICATION_DELIVERY_OFF = 'off';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -40,7 +45,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name', 'email', 'phone_number', 'password', 'role', 'hierarchy_id',
-        'message_delivery_preference', 'message_delivery_preference_locked',
+        'message_delivery_preference', 'message_delivery_preference_locked', 'notification_preferences',
     ];
 
     public static function roleOptions(): array
@@ -62,6 +67,27 @@ class User extends Authenticatable
             self::MESSAGE_DELIVERY_BOTH => 'Inbox + Email',
             self::MESSAGE_DELIVERY_INBOX => 'Inbox Only',
             self::MESSAGE_DELIVERY_EMAIL => 'Email Only',
+        ];
+    }
+
+    public static function notificationDeliveryOptions(): array
+    {
+        return [
+            self::NOTIFICATION_DELIVERY_DEFAULT => 'Use main delivery setting',
+            self::MESSAGE_DELIVERY_BOTH => 'Inbox + Email',
+            self::MESSAGE_DELIVERY_INBOX => 'Inbox Only',
+            self::MESSAGE_DELIVERY_EMAIL => 'Email Only',
+            self::NOTIFICATION_DELIVERY_OFF => 'Off',
+        ];
+    }
+
+    public static function notificationPreferenceGroups(): array
+    {
+        return [
+            'reminders' => 'Reading and training reminders',
+            'leader_digest' => 'Leader digests',
+            'admin_digest' => 'Admin digests',
+            'vacancy_alert' => 'Vacancy alerts',
         ];
     }
 
@@ -119,6 +145,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'message_delivery_preference_locked' => 'boolean',
+            'notification_preferences' => 'array',
         ];
     }
 
@@ -398,9 +425,15 @@ class User extends Authenticatable
 
     public function unreadInboxCount(): int
     {
-        return $this->receivedMessageRecipients()
-            ->whereNull('read_at')
-            ->count();
+        $query = $this->receivedMessageRecipients()
+            ->whereNull('read_at');
+
+        if (SchemaCapabilities::supportsMessageRecipientFolders()) {
+            $query->whereNull('deleted_at')
+                ->whereNull('archived_at');
+        }
+
+        return $query->count();
     }
 
     public function messageDeliveryPreferenceLabel(): ?string
@@ -410,6 +443,17 @@ class User extends Authenticatable
         }
 
         return self::messageDeliveryOptions()[$this->message_delivery_preference] ?? null;
+    }
+
+    public function notificationPreferenceValue(string $group): string
+    {
+        $value = data_get($this->notification_preferences ?? [], $group);
+
+        if (! is_string($value) || $value === '') {
+            return self::NOTIFICATION_DELIVERY_DEFAULT;
+        }
+
+        return $value;
     }
 
     /**
