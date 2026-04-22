@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Hierarchy;
 use App\Models\ReadingPlan;
+use App\Models\SystemRole;
 use App\Models\User;
+use App\Services\Auditing\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class AdminUserController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     public function index(Request $request)
     {
         $perPage = (int) $request->integer('per_page', 15);
@@ -25,6 +32,7 @@ class AdminUserController extends Controller
         }
 
         $query = User::with(['readingPlans', 'readingProgress', 'hierarchy.parent'])
+            ->with(['systemRoles.permissions'])
             ->withCount(['readingPlans', 'readingProgress']);
 
         // Search functionality
@@ -79,6 +87,7 @@ class AdminUserController extends Controller
             'hierarchy.parent',
             'readingPlans.dailyReadings',
             'readingProgress.dailyReading.readingPlan',
+            'systemRoles.permissions',
         ]);
 
         // Get user's reading statistics
@@ -106,8 +115,9 @@ class AdminUserController extends Controller
         $hierarchies = Hierarchy::with(['parent', 'leader'])->ordered()->get();
         $roleOptions = User::roleOptions();
         $deliveryOptions = User::messageDeliveryOptions();
+        $systemRoles = SystemRole::query()->with('permissions')->orderBy('name')->get();
 
-        return view('admin.users.create', compact('readingPlans', 'hierarchies', 'roleOptions', 'deliveryOptions'));
+        return view('admin.users.create', compact('readingPlans', 'hierarchies', 'roleOptions', 'deliveryOptions', 'systemRoles'));
     }
 
     public function store(Request $request)
@@ -123,6 +133,8 @@ class AdminUserController extends Controller
             'message_delivery_preference_locked' => ['nullable', 'boolean'],
             'reading_plans' => ['array'],
             'reading_plans.*' => ['exists:reading_plans,id'],
+            'system_role_ids' => ['array'],
+            'system_role_ids.*' => ['exists:system_roles,id'],
         ]);
 
         $selectedHierarchy = $request->filled('hierarchy_id')
@@ -145,6 +157,7 @@ class AdminUserController extends Controller
             ]);
 
             $this->syncLeadershipAssignment($user, $selectedHierarchy, $request->role);
+            $user->systemRoles()->sync($request->input('system_role_ids', []));
 
             // Attach reading plans if selected
             if ($request->filled('reading_plans')) {
@@ -168,8 +181,10 @@ class AdminUserController extends Controller
         $hierarchies = Hierarchy::with(['parent', 'leader'])->ordered()->get();
         $roleOptions = User::roleOptions();
         $deliveryOptions = User::messageDeliveryOptions();
+        $systemRoles = SystemRole::query()->with('permissions')->orderBy('name')->get();
+        $userSystemRoleIds = $user->systemRoles()->pluck('system_roles.id')->toArray();
 
-        return view('admin.users.edit', compact('user', 'readingPlans', 'userPlanIds', 'hierarchies', 'roleOptions', 'deliveryOptions'));
+        return view('admin.users.edit', compact('user', 'readingPlans', 'userPlanIds', 'hierarchies', 'roleOptions', 'deliveryOptions', 'systemRoles', 'userSystemRoleIds'));
     }
 
     public function update(Request $request, User $user)
@@ -185,6 +200,8 @@ class AdminUserController extends Controller
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'reading_plans' => ['array'],
             'reading_plans.*' => ['exists:reading_plans,id'],
+            'system_role_ids' => ['array'],
+            'system_role_ids.*' => ['exists:system_roles,id'],
         ]);
 
         $selectedHierarchy = $request->filled('hierarchy_id')
@@ -193,6 +210,7 @@ class AdminUserController extends Controller
 
         $this->validateHierarchyRoleAlignment($request->input('role'), $selectedHierarchy);
         $this->guardAgainstUnsafeLeadershipRemoval($user, $request->input('role'), $selectedHierarchy);
+        $this->guardAgainstRemovingFinalLegacyAdmin($user, $request->input('role'));
 
         DB::transaction(function () use ($request, $user, $selectedHierarchy) {
             $updateData = [
@@ -212,6 +230,7 @@ class AdminUserController extends Controller
             $user->update($updateData);
             $user->refresh();
             $this->syncLeadershipAssignment($user, $selectedHierarchy, $request->role);
+            $user->systemRoles()->sync($request->input('system_role_ids', []));
 
             // Sync reading plans
             if ($request->has('reading_plans')) {
@@ -250,12 +269,14 @@ class AdminUserController extends Controller
     public function bulkAction(Request $request)
     {
         $request->validate([
-            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy'],
+            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy,distribute_evenly'],
             'user_ids' => ['required', 'array'],
             'user_ids.*' => ['exists:users,id'],
             'reading_plan_id' => ['required_if:action,assign_plan,remove_plan', 'exists:reading_plans,id'],
             'role' => ['required_if:action,change_role', 'in:'.implode(',', User::assignableRoles())],
             'hierarchy_id' => ['required_if:action,assign_hierarchy', 'nullable', 'exists:hierarchies,id'],
+            'target_team_ids' => ['required_if:action,distribute_evenly', 'array'],
+            'target_team_ids.*' => ['exists:hierarchies,id'],
         ]);
 
         $users = User::whereIn('id', $request->user_ids)->get();
@@ -290,6 +311,7 @@ class AdminUserController extends Controller
 
             case 'change_role':
                 $users->each(function ($user) use ($request) {
+                    $this->guardAgainstRemovingFinalLegacyAdmin($user, $request->role);
                     $user->update(['role' => $request->role]);
                 });
                 $message = 'Role updated for selected users.';
@@ -323,6 +345,49 @@ class AdminUserController extends Controller
                     }
                 });
                 $message = 'Group assignment cleared for selected users.';
+                break;
+
+            case 'distribute_evenly':
+                $teams = Hierarchy::query()
+                    ->withCount('members')
+                    ->whereIn('id', $request->input('target_team_ids', []))
+                    ->get();
+
+                $this->validateDistributionTargets($users, $teams);
+
+                DB::transaction(function () use ($users, $teams, $request) {
+                    $balancedTeams = $teams->sortBy([
+                        ['members_count', 'asc'],
+                        ['name', 'asc'],
+                    ])->values();
+
+                    foreach ($users as $user) {
+                        $team = $balancedTeams->sortBy([
+                            ['members_count', 'asc'],
+                            ['name', 'asc'],
+                        ])->first();
+                        $previousHierarchy = $user->hierarchy;
+
+                        $user->update([
+                            'hierarchy_id' => $team->id,
+                        ]);
+
+                        $team->members_count++;
+
+                        $this->auditLogger->log(
+                            'hierarchy.member_rebalanced',
+                            $request->user(),
+                            $user->fresh('hierarchy.parent'),
+                            [
+                                'previous_hierarchy' => $previousHierarchy?->displayPath(),
+                                'new_hierarchy' => $team->displayPath(),
+                            ],
+                            "Moved {$user->name} to {$team->name} through balanced team distribution.",
+                        );
+                    }
+                });
+
+                $message = 'Selected members were distributed evenly across the chosen teams.';
                 break;
         }
 
@@ -463,5 +528,47 @@ class AdminUserController extends Controller
         throw ValidationException::withMessages([
             'role' => "Assign a replacement leader to {$currentLeadershipHierarchy->name} before moving or demoting this user.",
         ]);
+    }
+
+    private function guardAgainstRemovingFinalLegacyAdmin(User $user, string $newRole): void
+    {
+        if ($user->role !== User::ROLE_ADMIN || $newRole === User::ROLE_ADMIN) {
+            return;
+        }
+
+        if (User::query()->where('role', User::ROLE_ADMIN)->count() > 1) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'role' => 'Assign another legacy admin before changing the final admin account to a different hierarchy role.',
+        ]);
+    }
+
+    private function validateDistributionTargets($users, $teams): void
+    {
+        if ($teams->count() < 2) {
+            throw ValidationException::withMessages([
+                'target_team_ids' => 'Choose at least two teams to distribute users across.',
+            ]);
+        }
+
+        if ($teams->contains(fn (Hierarchy $hierarchy) => $hierarchy->type !== 'team')) {
+            throw ValidationException::withMessages([
+                'target_team_ids' => 'Balanced distribution only works across teams.',
+            ]);
+        }
+
+        if ($users->contains(fn (User $user) => $user->role !== User::ROLE_MEMBER)) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Only members can be distributed evenly across teams.',
+            ]);
+        }
+
+        if ($teams->pluck('parent_id')->unique()->count() > 1) {
+            throw ValidationException::withMessages([
+                'target_team_ids' => 'Choose teams from the same batch when distributing members evenly.',
+            ]);
+        }
     }
 }

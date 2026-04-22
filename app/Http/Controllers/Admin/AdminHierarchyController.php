@@ -5,12 +5,19 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Hierarchy;
 use App\Models\User;
+use App\Services\Auditing\AuditLogger;
+use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AdminHierarchyController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     private const TYPE_LABELS = [
         'clan' => 'Clan',
         'squad' => 'Squad',
@@ -95,11 +102,27 @@ class AdminHierarchyController extends Controller
             'platoons' => $hierarchies->where('type', 'platoon')->count(),
             'batches' => $hierarchies->where('type', 'batch')->count(),
             'teams' => $hierarchies->where('type', 'team')->count(),
+            'vacant' => $hierarchies->whereNull('leader_id')->count(),
         ];
 
         $leaders = User::whereIn('role', User::leaderRoles())
             ->orderBy('name')
             ->get();
+        $promotableUsers = User::query()
+            ->whereNotIn('role', [User::ROLE_ADMIN])
+            ->whereDoesntHave('systemRoles', fn ($query) => $query->where('slug', 'super_admin'))
+            ->orderBy('name')
+            ->get()
+            ->groupBy('hierarchy_id');
+        $descendantTeams = $hierarchies->mapWithKeys(function (Hierarchy $hierarchy) {
+            return [
+                $hierarchy->id => Hierarchy::with(['parent'])
+                    ->whereIn('id', $hierarchy->descendantTeamsIncludingSelf()->pluck('id'))
+                    ->ordered()
+                    ->get(),
+            ];
+        });
+        $teamBalanceInsights = $this->buildTeamBalanceInsights($hierarchies);
 
         $typeLabels = self::TYPE_LABELS;
         $recommendedParents = [
@@ -141,6 +164,9 @@ class AdminHierarchyController extends Controller
             'recommendedParents',
             'expectedLeaderLabels',
             'displayPaths',
+            'promotableUsers',
+            'descendantTeams',
+            'teamBalanceInsights',
         ));
     }
 
@@ -191,6 +217,115 @@ class AdminHierarchyController extends Controller
 
         return redirect()->route('admin.hierarchies.index')
             ->with('success', "{$hierarchy->name} was updated successfully.");
+    }
+
+    public function promoteLeader(Request $request, Hierarchy $hierarchy)
+    {
+        if ($hierarchy->leader_id) {
+            throw ValidationException::withMessages([
+                'promote_user_id' => "Assign a replacement through the edit form before changing the leader for {$hierarchy->name}.",
+            ]);
+        }
+
+        $validated = $request->validate([
+            'promote_user_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $user = User::query()->findOrFail($validated['promote_user_id']);
+
+        if (Hierarchy::query()->where('leader_id', $user->id)->exists()) {
+            throw ValidationException::withMessages([
+                'promote_user_id' => "{$user->name} already leads another hierarchy.",
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $hierarchy, $user) {
+            $newRole = $this->expectedLeaderRoleForType($hierarchy->type);
+
+            $user->update([
+                'role' => $newRole,
+                'hierarchy_id' => $hierarchy->id,
+            ]);
+
+            $hierarchy->update([
+                'leader_id' => $user->id,
+            ]);
+
+            $this->auditLogger->log(
+                'hierarchy.leader_promoted',
+                $request->user(),
+                $hierarchy->fresh('leader'),
+                [
+                    'promoted_user' => $user->name,
+                    'new_role' => $user->role,
+                    'hierarchy' => $hierarchy->displayPath(),
+                ],
+                "Promoted {$user->name} to lead {$hierarchy->name}.",
+            );
+        });
+
+        return redirect()->route('admin.hierarchies.index')
+            ->with('success', "{$user->name} is now leading {$hierarchy->name}.");
+    }
+
+    public function demoteLeader(Request $request, Hierarchy $hierarchy)
+    {
+        $leader = $hierarchy->leader;
+
+        if (! $leader) {
+            throw ValidationException::withMessages([
+                'demote_target_team_id' => 'There is no leader assigned to this hierarchy.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'demote_target_team_id' => ['nullable', 'exists:hierarchies,id'],
+        ]);
+
+        $targetTeam = null;
+
+        if ($hierarchy->type !== 'team') {
+            if (empty($validated['demote_target_team_id'])) {
+                throw ValidationException::withMessages([
+                    'demote_target_team_id' => 'Choose a destination team for this leader before demoting them.',
+                ]);
+            }
+
+            $targetTeam = Hierarchy::query()->findOrFail($validated['demote_target_team_id']);
+
+            if ($targetTeam->type !== 'team' || ! $hierarchy->descendantIdsIncludingSelf()->contains($targetTeam->id)) {
+                throw ValidationException::withMessages([
+                    'demote_target_team_id' => 'The destination must be a team within this hierarchy branch.',
+                ]);
+            }
+        } else {
+            $targetTeam = $hierarchy;
+        }
+
+        DB::transaction(function () use ($request, $hierarchy, $leader, $targetTeam) {
+            $hierarchy->update([
+                'leader_id' => null,
+            ]);
+
+            $leader->update([
+                'role' => User::ROLE_MEMBER,
+                'hierarchy_id' => $targetTeam?->id,
+            ]);
+
+            $this->auditLogger->log(
+                'hierarchy.leader_demoted',
+                $request->user(),
+                $leader->fresh('hierarchy.parent'),
+                [
+                    'former_hierarchy' => $hierarchy->displayPath(),
+                    'target_team' => $targetTeam?->displayPath(),
+                ],
+                "Demoted {$leader->name} from leading {$hierarchy->name}.",
+            );
+        });
+
+        return redirect()->route('admin.hierarchies.index')
+            ->with('success', "{$leader->name} was demoted and released from {$hierarchy->name}.");
     }
 
     private function validateHierarchyData(Request $request, ?Hierarchy $hierarchy = null): array
@@ -267,5 +402,58 @@ class AdminHierarchyController extends Controller
             'team' => in_array($parentType, ['batch'], true),
             default => false,
         };
+    }
+
+    private function buildTeamBalanceInsights(Collection $hierarchies): Collection
+    {
+        $teams = $hierarchies->where('type', 'team')->values();
+
+        if ($teams->isEmpty()) {
+            return collect();
+        }
+
+        $memberCounts = User::query()
+            ->where('role', User::ROLE_MEMBER)
+            ->whereIn('hierarchy_id', $teams->pluck('id'))
+            ->selectRaw('hierarchy_id, count(*) as total')
+            ->groupBy('hierarchy_id')
+            ->pluck('total', 'hierarchy_id');
+
+        return $hierarchies
+            ->where('type', 'batch')
+            ->map(function (Hierarchy $batch) use ($teams, $memberCounts) {
+                $childTeams = $teams
+                    ->where('parent_id', $batch->id)
+                    ->map(function (Hierarchy $team) use ($memberCounts) {
+                        return [
+                            'team' => $team,
+                            'member_count' => (int) ($memberCounts[$team->id] ?? 0),
+                        ];
+                    })
+                    ->sortBy('member_count')
+                    ->values();
+
+                if ($childTeams->count() < 2) {
+                    return null;
+                }
+
+                $lightest = $childTeams->first();
+                $heaviest = $childTeams->last();
+                $spread = $heaviest['member_count'] - $lightest['member_count'];
+
+                if ($spread < 2) {
+                    return null;
+                }
+
+                return [
+                    'batch' => $batch,
+                    'child_teams' => $childTeams,
+                    'spread' => $spread,
+                    'suggested_moves' => (int) floor($spread / 2),
+                ];
+            })
+            ->filter()
+            ->sortByDesc('spread')
+            ->values();
     }
 }

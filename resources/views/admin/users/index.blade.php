@@ -124,6 +124,7 @@
                             <option value="remove_plan">Remove reading plan</option>
                             <option value="change_role">Change role</option>
                             <option value="assign_hierarchy">Assign group</option>
+                            <option value="distribute_evenly">Distribute across teams evenly</option>
                             <option value="clear_hierarchy">Clear group</option>
                             <option value="delete">Delete users</option>
                         </select>
@@ -162,6 +163,18 @@
                                     <option value="{{ $hierarchy->id }}">{{ $hierarchy->displayPath() }}</option>
                                 @endforeach
                             </select>
+                        </label>
+                    </div>
+
+                    <div id="team-distribution-select" class="hidden">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Target teams</span>
+                            <select name="target_team_ids[]" id="bulk-target-teams" multiple class="mt-2 min-h-36 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                @foreach($hierarchies->where('type', 'team') as $hierarchy)
+                                    <option value="{{ $hierarchy->id }}">{{ $hierarchy->displayPath() }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-2 text-xs text-slate-500">Choose at least two teams from the same batch. Selected members will be placed into the lightest-loaded team first.</p>
                         </label>
                     </div>
 
@@ -372,16 +385,19 @@
             document.getElementById('bulk-reading-plan').addEventListener('change', updateBulkActions);
             document.getElementById('bulk-role').addEventListener('change', updateBulkActions);
             document.getElementById('bulk-hierarchy').addEventListener('change', updateBulkActions);
+            document.getElementById('bulk-target-teams').addEventListener('change', updateBulkActions);
 
             document.getElementById('bulk-action').addEventListener('change', function() {
                 const action = this.value;
                 const readingPlanSelect = document.getElementById('reading-plan-select');
                 const roleSelect = document.getElementById('role-select');
                 const hierarchySelect = document.getElementById('hierarchy-select');
+                const teamDistributionSelect = document.getElementById('team-distribution-select');
 
                 readingPlanSelect.classList.add('hidden');
                 roleSelect.classList.add('hidden');
                 hierarchySelect.classList.add('hidden');
+                teamDistributionSelect.classList.add('hidden');
 
                 if (action === 'assign_plan' || action === 'remove_plan') {
                     readingPlanSelect.classList.remove('hidden');
@@ -389,6 +405,8 @@
                     roleSelect.classList.remove('hidden');
                 } else if (action === 'assign_hierarchy') {
                     hierarchySelect.classList.remove('hidden');
+                } else if (action === 'distribute_evenly') {
+                    teamDistributionSelect.classList.remove('hidden');
                 }
 
                 updateBulkActions();
@@ -403,6 +421,7 @@
                 const readingPlanValue = document.getElementById('bulk-reading-plan').value;
                 const roleValue = document.getElementById('bulk-role').value;
                 const hierarchyValue = document.getElementById('bulk-hierarchy').value;
+                const targetTeamsValue = Array.from(document.getElementById('bulk-target-teams').selectedOptions).map((option) => option.value);
 
                 let actionReady = action.length > 0;
 
@@ -412,6 +431,8 @@
                     actionReady = roleValue.length > 0;
                 } else if (action === 'assign_hierarchy') {
                     actionReady = hierarchyValue.length > 0;
+                } else if (action === 'distribute_evenly') {
+                    actionReady = targetTeamsValue.length >= 2;
                 }
 
                 bulkSubmit.disabled = !(selectedCount > 0 && actionReady);
@@ -435,6 +456,12 @@
                 if (action === 'assign_hierarchy' && ! document.getElementById('bulk-hierarchy').value) {
                     e.preventDefault();
                     alert('Please choose a group for the selected users.');
+                    return;
+                }
+
+                if (action === 'distribute_evenly' && document.getElementById('bulk-target-teams').selectedOptions.length < 2) {
+                    e.preventDefault();
+                    alert('Please choose at least two teams for balanced distribution.');
                     return;
                 }
 

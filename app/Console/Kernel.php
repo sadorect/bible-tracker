@@ -14,5 +14,6 @@ class Kernel extends ConsoleKernel
     {
         // Check reading plan progress daily at midnight
         $schedule->command('reading:check-progress')->dailyAt('00:01');
+        $schedule->command('automation:run-daily')->dailyAt('06:30');
     }
 }

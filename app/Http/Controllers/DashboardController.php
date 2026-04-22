@@ -6,12 +6,18 @@ use App\Models\BibleChapter;
 use App\Models\Hierarchy;
 use App\Models\ReadingProgress;
 use App\Models\User;
+use App\Services\Auditing\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     public function index()
     {
         $user = auth()->user();
@@ -249,9 +255,24 @@ class DashboardController extends Controller
             'hierarchy_id' => ['required', Rule::in($manageableTeamIds)],
         ]);
 
+        $previousHierarchy = $member->hierarchy()->with('parent')->first();
+        $newHierarchy = $manageableTeams->firstWhere('id', (int) $validated['hierarchy_id']);
+
         $member->update([
             'hierarchy_id' => (int) $validated['hierarchy_id'],
         ]);
+
+        $this->auditLogger->log(
+            'hierarchy.member_reassigned',
+            $user,
+            $member->fresh('hierarchy.parent'),
+            [
+                'previous_hierarchy' => $previousHierarchy?->displayPath(),
+                'new_hierarchy' => $newHierarchy?->displayPath(),
+                'leader_scope' => $leadHierarchy->displayPath(),
+            ],
+            "{$member->name} was reassigned from ".($previousHierarchy?->displayPath() ?? 'Unassigned')." to ".($newHierarchy?->displayPath() ?? 'Unassigned').'.',
+        );
 
         return redirect()->route('hierarchy.manage')
             ->with('success', "{$member->name} was reassigned successfully.");

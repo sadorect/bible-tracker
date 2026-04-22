@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminAutomationController;
 use App\Http\Controllers\Admin\AdminHierarchyController;
+use App\Http\Controllers\Admin\AdminAuditLogController;
 use App\Http\Controllers\Admin\AdminMessagingSettingsController;
 use App\Http\Controllers\Admin\AdminReadingPlanController;
+use App\Http\Controllers\Admin\AdminSystemRoleController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\UserProgressController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MessageCenterController;
+use App\Http\Controllers\NotificationCenterController;
 use App\Http\Controllers\LeaderHierarchyController;
 use App\Http\Controllers\ReadingPlanInviteController;
 use App\Http\Controllers\ReadingPlanController;
@@ -29,7 +33,7 @@ Route::get('/enroll/{token}/register-fresh', [ReadingPlanInviteController::class
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         // Check if user is admin and redirect to admin dashboard
-        if (Auth::user()->isAdmin()) {
+        if (Auth::user()->canAccessAdminPanel()) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -60,6 +64,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/messages/compose/preview', [MessageCenterController::class, 'preview'])->name('messages.preview');
     Route::post('/messages', [MessageCenterController::class, 'store'])->name('messages.store');
     Route::get('/messages/{message}', [MessageCenterController::class, 'show'])->name('messages.show');
+    Route::get('/notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifications/read-all', [NotificationCenterController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::patch('/notifications/{notification}/read', [NotificationCenterController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/enroll/{token}/accept', [ReadingPlanInviteController::class, 'accept'])->name('reading-plan-invites.accept');
 
     // Leader hierarchy tree — scoped to the leader's own branch
@@ -69,40 +76,60 @@ Route::middleware(['auth'])->group(function () {
 // Admin routes - All routes will have /admin prefix
 Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->group(function () {
     // Admin dashboard - URL: /admin/dashboard
-    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/', [AdminDashboardController::class, 'index'])->middleware('can:dashboard.view')->name('dashboard');
 
     // User management - URLs: /admin/users/*
-    Route::resource('users', AdminUserController::class);
-    Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])->name('users.bulk-action');
+    Route::resource('users', AdminUserController::class)->middleware('can:users.manage');
+    Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])->middleware('can:users.manage')->name('users.bulk-action');
 
-    Route::get('hierarchies', [AdminHierarchyController::class, 'index'])->name('hierarchies.index');
-    Route::get('hierarchies/tree', [AdminHierarchyController::class, 'tree'])->name('hierarchies.tree');
-    Route::post('hierarchies', [AdminHierarchyController::class, 'store'])->name('hierarchies.store');
-    Route::put('hierarchies/{hierarchy}', [AdminHierarchyController::class, 'update'])->name('hierarchies.update');
-    Route::get('hierarchies/{hierarchy}', [AdminHierarchyController::class, 'show'])->name('hierarchies.show');
+    Route::get('hierarchies', [AdminHierarchyController::class, 'index'])->middleware('can:hierarchies.manage')->name('hierarchies.index');
+    Route::get('hierarchies/tree', [AdminHierarchyController::class, 'tree'])->middleware('can:hierarchies.manage')->name('hierarchies.tree');
+    Route::post('hierarchies', [AdminHierarchyController::class, 'store'])->middleware('can:hierarchies.manage')->name('hierarchies.store');
+    Route::put('hierarchies/{hierarchy}', [AdminHierarchyController::class, 'update'])->middleware('can:hierarchies.manage')->name('hierarchies.update');
+    Route::post('hierarchies/{hierarchy}/promote-leader', [AdminHierarchyController::class, 'promoteLeader'])->middleware('can:hierarchies.manage')->name('hierarchies.promote-leader');
+    Route::post('hierarchies/{hierarchy}/demote-leader', [AdminHierarchyController::class, 'demoteLeader'])->middleware('can:hierarchies.manage')->name('hierarchies.demote-leader');
+    Route::get('hierarchies/{hierarchy}', [AdminHierarchyController::class, 'show'])->middleware('can:hierarchies.manage')->name('hierarchies.show');
 
     // User Progress routes - URLs: /admin/progress/*
-    Route::get('progress', [UserProgressController::class, 'index'])->name('progress.index');
-    Route::get('progress/user/{user}', [UserProgressController::class, 'userDetail'])->name('progress.user');
-    Route::get('progress/plan/{readingPlan}', [UserProgressController::class, 'planDetail'])->name('progress.plan');
-    Route::get('progress/export', [UserProgressController::class, 'export'])->name('progress.export');
+    Route::get('progress', [UserProgressController::class, 'index'])->middleware('can:progress.view')->name('progress.index');
+    Route::get('progress/user/{user}', [UserProgressController::class, 'userDetail'])->middleware('can:progress.view')->name('progress.user');
+    Route::get('progress/plan/{readingPlan}', [UserProgressController::class, 'planDetail'])->middleware('can:progress.view')->name('progress.plan');
+    Route::get('progress/export', [UserProgressController::class, 'export'])->middleware('can:progress.export')->name('progress.export');
+    Route::post('progress/presets', [UserProgressController::class, 'storePreset'])->middleware('can:progress.view')->name('progress.presets.store');
+    Route::delete('progress/presets/{reportPreset}', [UserProgressController::class, 'destroyPreset'])->middleware('can:progress.view')->name('progress.presets.destroy');
+    Route::get('audits', [AdminAuditLogController::class, 'index'])->middleware('can:audits.view')->name('audits.index');
+    Route::get('automation', [AdminAutomationController::class, 'index'])->middleware('can:automation.manage')->name('automation.index');
+    Route::put('automation', [AdminAutomationController::class, 'update'])->middleware('can:automation.manage')->name('automation.update');
+    Route::post('automation/run-now', [AdminAutomationController::class, 'runNow'])->middleware('can:automation.manage')->name('automation.run-now');
 
     // Reading plan management - URLs: /admin/reading-plans/*
-    Route::resource('reading-plans', AdminReadingPlanController::class);
+    Route::resource('reading-plans', AdminReadingPlanController::class)->middleware('can:plans.manage');
     Route::post('reading-plans/{readingPlan}/training-resources', [AdminReadingPlanController::class, 'storeTrainingResource'])
+        ->middleware('can:plans.manage')
         ->name('reading-plans.training-resources.store');
     Route::delete('reading-plans/{readingPlan}/training-resources/{trainingResource}', [AdminReadingPlanController::class, 'destroyTrainingResource'])
+        ->middleware('can:plans.manage')
         ->name('reading-plans.training-resources.destroy');
     Route::post('reading-plans/{readingPlan}/invites', [AdminReadingPlanController::class, 'storeInvite'])
+        ->middleware('can:plans.manage')
         ->name('reading-plans.invites.store');
     Route::delete('reading-plans/{readingPlan}/invites/{readingPlanInvite}', [AdminReadingPlanController::class, 'revokeInvite'])
+        ->middleware('can:plans.manage')
         ->name('reading-plans.invites.revoke');
+    Route::put('reading-plans/settings/lifecycle', [AdminReadingPlanController::class, 'updateLifecycleSettings'])
+        ->middleware('can:plans.manage')
+        ->name('reading-plans.settings.update');
 
-    Route::get('messages/settings', [AdminMessagingSettingsController::class, 'index'])->name('messages.settings');
-    Route::put('messages/settings', [AdminMessagingSettingsController::class, 'update'])->name('messages.settings.update');
-    Route::post('messages/templates', [AdminMessagingSettingsController::class, 'storeTemplate'])->name('messages.templates.store');
-    Route::put('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'updateTemplate'])->name('messages.templates.update');
-    Route::delete('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'destroyTemplate'])->name('messages.templates.destroy');
+    Route::get('messages/settings', [AdminMessagingSettingsController::class, 'index'])->middleware('can:messages.manage_templates')->name('messages.settings');
+    Route::put('messages/settings', [AdminMessagingSettingsController::class, 'update'])->middleware('can:messages.manage_templates')->name('messages.settings.update');
+    Route::post('messages/templates', [AdminMessagingSettingsController::class, 'storeTemplate'])->middleware('can:messages.manage_templates')->name('messages.templates.store');
+    Route::put('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'updateTemplate'])->middleware('can:messages.manage_templates')->name('messages.templates.update');
+    Route::delete('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'destroyTemplate'])->middleware('can:messages.manage_templates')->name('messages.templates.destroy');
+
+    Route::get('system-roles', [AdminSystemRoleController::class, 'index'])->middleware('can:system_roles.manage')->name('system-roles.index');
+    Route::post('system-roles', [AdminSystemRoleController::class, 'store'])->middleware('can:system_roles.manage')->name('system-roles.store');
+    Route::put('system-roles/{systemRole}', [AdminSystemRoleController::class, 'update'])->middleware('can:system_roles.manage')->name('system-roles.update');
+    Route::delete('system-roles/{systemRole}', [AdminSystemRoleController::class, 'destroy'])->middleware('can:system_roles.manage')->name('system-roles.destroy');
 
     Route::redirect('settings', 'messages/settings')->name('settings');
 });

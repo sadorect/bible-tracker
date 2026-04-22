@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ReadingPlan;
 use App\Models\ReadingPlanInvite;
 use App\Models\TrainingResource;
+use App\Services\Auditing\AuditLogger;
+use App\Services\Plans\PlanLifecycleSettings;
 use Artisan;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -16,14 +18,26 @@ use Illuminate\Validation\ValidationException;
 
 class AdminReadingPlanController extends Controller
 {
+    public function __construct(
+        private readonly PlanLifecycleSettings $lifecycleSettings,
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     /**
      * Display a listing of the reading plans.
      */
     public function index()
     {
-        $readingPlans = ReadingPlan::all();
+        $readingPlans = ReadingPlan::query()
+            ->orderByRaw("case when lifecycle_status = '".ReadingPlan::STATUS_ACTIVE."' then 0 when lifecycle_status = '".ReadingPlan::STATUS_RECRUITING."' then 1 else 2 end")
+            ->orderBy('start_date')
+            ->get();
 
-        return view('admin.reading-plans.index', compact('readingPlans'));
+        return view('admin.reading-plans.index', [
+            'readingPlans' => $readingPlans,
+            'lifecycleSettings' => $this->lifecycleSettings->all(),
+        ]);
     }
 
     /**
@@ -33,6 +47,7 @@ class AdminReadingPlanController extends Controller
     {
         return view('admin.reading-plans.create', [
             'typeDefaults' => ReadingPlan::typeConfigurations(),
+            'lifecycleStatuses' => ReadingPlan::lifecycleStatusOptions(),
         ]);
     }
 
@@ -42,21 +57,36 @@ class AdminReadingPlanController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateReadingPlan($request);
+        $this->ensureLifecycleWithinLimits($validated['type'], $validated['lifecycle_status']);
 
         $readingPlan = ReadingPlan::create([
             'name' => $validated['name'],
             'type' => $validated['type'],
+            'lifecycle_status' => $validated['lifecycle_status'],
             'description' => $validated['description'] ?? '',
             'chapters_per_day' => $validated['chapters_per_day'],
             'streak_days' => $validated['streak_days'],
             'break_days' => $validated['break_days'],
             'start_date' => Carbon::parse($validated['start_date']),
             'end_date' => null,
-            'is_active' => $request->boolean('is_active'),
+            'enrollment_starts_at' => ! empty($validated['enrollment_starts_at']) ? Carbon::parse($validated['enrollment_starts_at']) : null,
+            'enrollment_ends_at' => ! empty($validated['enrollment_ends_at']) ? Carbon::parse($validated['enrollment_ends_at']) : null,
+            'is_active' => in_array($validated['lifecycle_status'], ReadingPlan::liveStatuses(), true),
             'additional_info' => $validated['additional_info'] ?? '',
         ]);
 
         $this->regenerateDailyReadings($readingPlan);
+        $readingPlan->refresh();
+
+        $this->auditLogger->log(
+            'plans.created',
+            $request->user(),
+            $readingPlan,
+            [
+                'plan' => $this->planSnapshot($readingPlan),
+            ],
+            "Created {$readingPlan->name} as a {$readingPlan->type_label} cohort in {$readingPlan->lifecycle_status_label}.",
+        );
 
         return redirect()->route('admin.reading-plans.index')
             ->with('success', 'Reading plan created successfully with daily readings.');
@@ -72,6 +102,7 @@ class AdminReadingPlanController extends Controller
         return view('admin.reading-plans.edit', [
             'readingPlan' => $readingPlan,
             'typeDefaults' => ReadingPlan::typeConfigurations(),
+            'lifecycleStatuses' => ReadingPlan::lifecycleStatusOptions(),
         ]);
     }
 
@@ -87,6 +118,8 @@ class AdminReadingPlanController extends Controller
     {
         $validated = $this->validateReadingPlan($request);
         $requiresRegeneration = $this->requiresScheduleRegeneration($readingPlan, $validated);
+        $this->ensureLifecycleWithinLimits($validated['type'], $validated['lifecycle_status'], $readingPlan);
+        $before = $this->planSnapshot($readingPlan);
 
         if ($requiresRegeneration && $readingPlan->readingProgress()->exists()) {
             throw ValidationException::withMessages([
@@ -97,12 +130,15 @@ class AdminReadingPlanController extends Controller
         $readingPlan->update([
             'name' => $validated['name'],
             'type' => $validated['type'],
+            'lifecycle_status' => $validated['lifecycle_status'],
             'description' => $validated['description'] ?? '',
             'chapters_per_day' => $validated['chapters_per_day'],
             'streak_days' => $validated['streak_days'],
             'break_days' => $validated['break_days'],
             'start_date' => Carbon::parse($validated['start_date']),
-            'is_active' => $request->boolean('is_active'),
+            'enrollment_starts_at' => ! empty($validated['enrollment_starts_at']) ? Carbon::parse($validated['enrollment_starts_at']) : null,
+            'enrollment_ends_at' => ! empty($validated['enrollment_ends_at']) ? Carbon::parse($validated['enrollment_ends_at']) : null,
+            'is_active' => in_array($validated['lifecycle_status'], ReadingPlan::liveStatuses(), true),
             'additional_info' => $validated['additional_info'] ?? '',
         ]);
 
@@ -112,6 +148,20 @@ class AdminReadingPlanController extends Controller
             $readingPlan->refresh();
             $readingPlan->syncScheduleDates();
         }
+
+        $readingPlan->refresh();
+
+        $this->auditLogger->log(
+            'plans.updated',
+            $request->user(),
+            $readingPlan,
+            [
+                'before' => $before,
+                'after' => $this->planSnapshot($readingPlan),
+                'schedule_regenerated' => $requiresRegeneration,
+            ],
+            "Updated {$readingPlan->name} and set it to {$readingPlan->lifecycle_status_label}.",
+        );
 
         return redirect()->route('admin.reading-plans.index')
             ->with('success', 'Reading plan updated successfully.');
@@ -211,7 +261,19 @@ class AdminReadingPlanController extends Controller
      */
     public function destroy(ReadingPlan $readingPlan)
     {
+        $planSnapshot = $this->planSnapshot($readingPlan);
+
         $readingPlan->delete();
+
+        $this->auditLogger->log(
+            'plans.deleted',
+            request()->user(),
+            null,
+            [
+                'plan' => $planSnapshot,
+            ],
+            "Deleted {$planSnapshot['name']}.",
+        );
 
         return redirect()->route('admin.reading-plans.index')
             ->with('success', 'Reading plan deleted successfully.');
@@ -277,16 +339,34 @@ class AdminReadingPlanController extends Controller
 
     public function storeInvite(Request $request, ReadingPlan $readingPlan)
     {
+        if (! $readingPlan->acceptsEnrollment()) {
+            throw ValidationException::withMessages([
+                'expires_at' => 'Enrollment links can only be created while this plan is currently accepting enrollments.',
+            ]);
+        }
+
         $validated = $request->validate([
             'label' => ['nullable', 'string', 'max:255'],
             'expires_at' => ['required', 'date', 'after:now'],
         ]);
 
-        $readingPlan->invites()->create([
+        $invite = $readingPlan->invites()->create([
             'created_by' => $request->user()->id,
             'label' => $validated['label'] ?? null,
             'expires_at' => Carbon::parse($validated['expires_at']),
         ]);
+
+        $this->auditLogger->log(
+            'plans.invites.created',
+            $request->user(),
+            $invite,
+            [
+                'plan' => $this->planSnapshot($readingPlan),
+                'expires_at' => $invite->expires_at,
+                'label' => $invite->label,
+            ],
+            "Generated an enrollment link for {$readingPlan->name}.",
+        );
 
         return redirect()->route('admin.reading-plans.edit', $readingPlan)
             ->with('success', 'Enrollment link generated successfully.');
@@ -300,23 +380,85 @@ class AdminReadingPlanController extends Controller
             'revoked_at' => now(),
         ]);
 
+        $this->auditLogger->log(
+            'plans.invites.revoked',
+            request()->user(),
+            $readingPlanInvite->fresh(),
+            [
+                'plan' => $this->planSnapshot($readingPlan),
+                'expires_at' => $readingPlanInvite->expires_at,
+                'label' => $readingPlanInvite->label,
+            ],
+            "Revoked an enrollment link for {$readingPlan->name}.",
+        );
+
         return redirect()->route('admin.reading-plans.edit', $readingPlan)
             ->with('success', 'Enrollment link revoked successfully.');
     }
 
+    public function updateLifecycleSettings(Request $request)
+    {
+        $before = $this->lifecycleSettings->all();
+        $validated = $request->validate([
+            'max_live_new_testament' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'max_live_old_testament' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'max_live_total' => ['nullable', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        $this->lifecycleSettings->update([
+            PlanLifecycleSettings::KEY_MAX_LIVE_NEW_TESTAMENT => $validated['max_live_new_testament'] ?? null,
+            PlanLifecycleSettings::KEY_MAX_LIVE_OLD_TESTAMENT => $validated['max_live_old_testament'] ?? null,
+            PlanLifecycleSettings::KEY_MAX_LIVE_TOTAL => $validated['max_live_total'] ?? null,
+        ]);
+
+        $this->auditLogger->log(
+            'plans.lifecycle_settings_updated',
+            $request->user(),
+            null,
+            [
+                'before' => $before,
+                'after' => $this->lifecycleSettings->all(),
+            ],
+            'Updated the live plan concurrency settings.',
+        );
+
+        return redirect()->route('admin.reading-plans.index')
+            ->with('success', 'Plan lifecycle settings updated successfully.');
+    }
+
     private function validateReadingPlan(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', Rule::in(ReadingPlan::supportedTypes())],
+            'lifecycle_status' => ['required', 'string', Rule::in(ReadingPlan::lifecycleStatuses())],
             'description' => ['nullable', 'string'],
             'chapters_per_day' => ['required', 'integer', 'min:1', 'max:100'],
             'streak_days' => ['required', 'integer', 'min:1', 'max:365'],
             'break_days' => ['required', 'integer', 'min:0', 'max:60'],
             'start_date' => ['required', 'date'],
-            'is_active' => ['boolean'],
+            'enrollment_starts_at' => ['nullable', 'date'],
+            'enrollment_ends_at' => ['nullable', 'date', 'after_or_equal:enrollment_starts_at'],
             'additional_info' => ['nullable', 'string'],
         ]);
+
+        $startDate = Carbon::parse($validated['start_date'])->startOfDay();
+        $today = Carbon::today();
+        $status = $validated['lifecycle_status'];
+
+        if ($status === ReadingPlan::STATUS_RECRUITING && $startDate->lt($today)) {
+            throw ValidationException::withMessages([
+                'lifecycle_status' => 'Recruiting plans should begin today or in the future. Use Active for cohorts already underway.',
+            ]);
+        }
+
+        if ($status === ReadingPlan::STATUS_ACTIVE && $startDate->gt($today)) {
+            throw ValidationException::withMessages([
+                'lifecycle_status' => 'Active plans should have a commencement date of today or earlier. Use Recruiting for future cohorts.',
+            ]);
+        }
+
+        return $validated;
     }
 
     private function requiresScheduleRegeneration(ReadingPlan $readingPlan, array $validated): bool
@@ -335,5 +477,56 @@ class AdminReadingPlanController extends Controller
 
         $readingPlan->refresh();
         $readingPlan->syncScheduleDates();
+    }
+
+    private function ensureLifecycleWithinLimits(string $type, string $status, ?ReadingPlan $ignorePlan = null): void
+    {
+        if (! in_array($status, ReadingPlan::liveStatuses(), true)) {
+            return;
+        }
+
+        $livePlans = ReadingPlan::query()
+            ->live()
+            ->when($ignorePlan, fn ($query) => $query->whereKeyNot($ignorePlan->id));
+
+        $typeSpecificLiveCount = (clone $livePlans)
+            ->where('type', $type)
+            ->count();
+        $totalLiveCount = (clone $livePlans)->count();
+
+        $typeLimit = $type === ReadingPlan::TYPE_NEW_TESTAMENT
+            ? $this->lifecycleSettings->maxLiveNewTestament()
+            : $this->lifecycleSettings->maxLiveOldTestament();
+
+        if ($typeLimit !== null && $typeSpecificLiveCount >= $typeLimit) {
+            throw ValidationException::withMessages([
+                'lifecycle_status' => 'This would exceed the current live-plan limit for '.ReadingPlan::defaultsFor($type)['label'].'. Update the lifecycle settings first if you want to allow more concurrent cohorts.',
+            ]);
+        }
+
+        $totalLimit = $this->lifecycleSettings->maxLiveTotal();
+
+        if ($totalLimit !== null && $totalLiveCount >= $totalLimit) {
+            throw ValidationException::withMessages([
+                'lifecycle_status' => 'This would exceed the current overall live-plan limit. Update the lifecycle settings first if you want to allow more concurrent cohorts.',
+            ]);
+        }
+    }
+
+    private function planSnapshot(ReadingPlan $readingPlan): array
+    {
+        return [
+            'id' => $readingPlan->id,
+            'name' => $readingPlan->name,
+            'type' => $readingPlan->type,
+            'lifecycle_status' => $readingPlan->lifecycle_status,
+            'chapters_per_day' => (int) $readingPlan->chapters_per_day,
+            'streak_days' => (int) $readingPlan->streak_days,
+            'break_days' => (int) $readingPlan->break_days,
+            'start_date' => $readingPlan->start_date?->toDateString(),
+            'end_date' => $readingPlan->end_date?->toDateString(),
+            'enrollment_starts_at' => $readingPlan->enrollment_starts_at?->toDateTimeString(),
+            'enrollment_ends_at' => $readingPlan->enrollment_ends_at?->toDateTimeString(),
+        ];
     }
 }

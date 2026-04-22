@@ -59,6 +59,18 @@
                     </label>
 
                     <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Lifecycle status</span>
+                        <select name="lifecycle_status" id="lifecycle_status" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            @foreach($lifecycleStatuses as $value => $label)
+                                <option value="{{ $value }}" {{ old('lifecycle_status', \App\Models\ReadingPlan::STATUS_RECRUITING) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('lifecycle_status')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
                         <span class="text-sm font-medium text-slate-700">Description</span>
                         <textarea name="description" id="description" rows="4" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">{{ old('description') }}</textarea>
                         @error('description')
@@ -98,7 +110,7 @@
                     </label>
                 </div>
 
-                <div class="grid gap-5 md:grid-cols-2">
+                <div class="grid gap-5 md:grid-cols-3">
                     <label class="block">
                         <span class="text-sm font-medium text-slate-700">Commencement date</span>
                         <input type="date" name="start_date" id="start_date" value="{{ old('start_date', date('Y-m-d')) }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
@@ -107,15 +119,23 @@
                         @enderror
                     </label>
 
-                    <div class="rounded-[1.5rem] bg-slate-50 p-5">
-                        <label class="flex items-center gap-3">
-                            <input type="checkbox" name="is_active" id="is_active" value="1" {{ old('is_active') ? 'checked' : '' }} class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <span class="text-sm font-medium text-slate-700">Mark this plan as active immediately</span>
-                        </label>
-                        @error('is_active')
-                            <p class="mt-3 text-sm text-rose-600">{{ $message }}</p>
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Enrollment opens</span>
+                        <input type="datetime-local" name="enrollment_starts_at" id="enrollment_starts_at" value="{{ old('enrollment_starts_at') }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        <p class="mt-2 text-xs text-slate-500">Leave blank to allow enrollments as soon as the plan becomes visible.</p>
+                        @error('enrollment_starts_at')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror
-                    </div>
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Enrollment closes</span>
+                        <input type="datetime-local" name="enrollment_ends_at" id="enrollment_ends_at" value="{{ old('enrollment_ends_at') }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        <p class="mt-2 text-xs text-slate-500">Leave blank to keep recruitment open while the plan stays live.</p>
+                        @error('enrollment_ends_at')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
                 </div>
 
                 <label class="block border-t border-slate-200 pt-8">
@@ -144,6 +164,7 @@
                     <p>Choose the stage carefully. The generator still uses the correct testament, but the pace and break rhythm are now yours to set.</p>
                     <p>Training resources can be added after the plan is created. Each item adds one day to the training window and can include both a YouTube video and a PDF.</p>
                     <p>The plan’s reading start date will automatically shift to begin after training is complete.</p>
+                    <p>Recruiting plans are public before commencement, active plans are already underway, and draft/closed plans stay hidden from member discovery.</p>
                 </div>
             </section>
 

@@ -44,13 +44,31 @@
                     </label>
 
                     <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Role</span>
+                        <span class="text-sm font-medium text-slate-700">Hierarchy role</span>
                         <select name="role" id="role" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                             @foreach($roleOptions as $value => $label)
                                 <option value="{{ $value }}" {{ old('role', $user->role) === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                         @error('role')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block md:col-span-2">
+                        <span class="text-sm font-medium text-slate-700">System access roles</span>
+                        <select name="system_role_ids[]" multiple class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            @foreach($systemRoles as $systemRole)
+                                <option value="{{ $systemRole->id }}" {{ in_array($systemRole->id, old('system_role_ids', $userSystemRoleIds), true) ? 'selected' : '' }}>
+                                    {{ $systemRole->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-2 text-xs text-slate-500">These roles grant admin console capabilities without changing the user’s hierarchy assignment.</p>
+                        @error('system_role_ids')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                        @error('system_role_ids.*')
                             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror
                     </label>
@@ -182,6 +200,10 @@
                     <div class="rounded-[1.5rem] bg-slate-50 p-4">
                         <p class="font-semibold text-slate-900">Assigned plans</p>
                         <p class="mt-1">{{ count($userPlanIds) }} active plan association(s).</p>
+                    </div>
+                    <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                        <p class="font-semibold text-slate-900">System access</p>
+                        <p class="mt-1">{{ count($userSystemRoleIds) }} access role(s).</p>
                     </div>
                 </div>
             </section>

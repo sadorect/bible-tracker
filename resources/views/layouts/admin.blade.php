@@ -17,6 +17,7 @@
 </head>
 @php($user = auth()->user())
 @php($unreadInboxCount = $user?->unreadInboxCount() ?? 0)
+@php($unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0)
 <body
     class="bg-slate-100 font-['Instrument_Sans'] text-slate-900 antialiased"
     x-data="{
@@ -68,35 +69,69 @@
                     </div>
 
                     <nav class="space-y-1.5">
-                        <a href="{{ route('admin.dashboard') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.dashboard') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
-                            <i class="fas fa-chart-pie w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Dashboard</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Home</span>
-                        </a>
-                        <a href="{{ route('admin.reading-plans.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.reading-plans.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
-                            <i class="fas fa-book-open-reader w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Reading Plans</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Plans</span>
-                        </a>
-                        <a href="{{ route('admin.users.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.users.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
-                            <i class="fas fa-users w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Users</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Users</span>
-                        </a>
-                        <a href="{{ route('admin.hierarchies.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.index') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
-                            <i class="fas fa-sitemap w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Hierarchies</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Groups</span>
-                        </a>
-                        <a href="{{ route('admin.hierarchies.tree') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.tree') || request()->routeIs('admin.hierarchies.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
-                            <i class="fas fa-diagram-project w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Tree view</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Tree</span>
-                        </a>
-                        <a href="{{ route('admin.progress.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.progress.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
-                            <i class="fas fa-chart-line w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Progress Reports</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Reports</span>
+                        @if($user->hasPermissionTo('dashboard.view'))
+                            <a href="{{ route('admin.dashboard') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.dashboard') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-chart-pie w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Dashboard</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Home</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('plans.manage'))
+                            <a href="{{ route('admin.reading-plans.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.reading-plans.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-book-open-reader w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Reading Plans</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Plans</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('users.manage'))
+                            <a href="{{ route('admin.users.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.users.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-users w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Users</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Users</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('hierarchies.manage'))
+                            <a href="{{ route('admin.hierarchies.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.index') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-sitemap w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Hierarchies</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Groups</span>
+                            </a>
+                            <a href="{{ route('admin.hierarchies.tree') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.hierarchies.tree') || request()->routeIs('admin.hierarchies.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
+                                <i class="fas fa-diagram-project w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Tree view</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Tree</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('progress.view'))
+                            <a href="{{ route('admin.progress.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.progress.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-chart-line w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Progress Reports</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Reports</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('audits.view'))
+                            <a href="{{ route('admin.audits.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.audits.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-clipboard-list w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Audit Trail</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Audit</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('automation.manage'))
+                            <a href="{{ route('admin.automation.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.automation.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-bolt w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Automation</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Auto</span>
+                            </a>
+                        @endif
+                        <a href="{{ route('notifications.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('notifications.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-bell w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms class="flex items-center gap-2">
+                                Alerts
+                                @if($unreadNotificationCount > 0)
+                                    <span class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadNotificationCount }}</span>
+                                @endif
+                            </span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Alerts</span>
                         </a>
                         <a href="{{ route('messages.inbox') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('messages.inbox') || request()->routeIs('messages.index') || request()->routeIs('messages.sent') || request()->routeIs('messages.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
                             <i class="fas fa-inbox w-5 text-center flex-shrink-0"></i>
@@ -113,11 +148,20 @@
                             <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Compose message</span>
                             <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Write</span>
                         </a>
-                        <a href="{{ route('admin.messages.settings') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.messages.settings*') || request()->routeIs('admin.messages.templates.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
-                            <i class="fas fa-gear w-5 text-center flex-shrink-0"></i>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Messaging settings</span>
-                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Setup</span>
-                        </a>
+                        @if($user->hasPermissionTo('messages.manage_templates'))
+                            <a href="{{ route('admin.messages.settings') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.messages.settings*') || request()->routeIs('admin.messages.templates.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
+                                <i class="fas fa-gear w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Messaging settings</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Setup</span>
+                            </a>
+                        @endif
+                        @if($user->hasPermissionTo('system_roles.manage'))
+                            <a href="{{ route('admin.system-roles.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.system-roles.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                                <i class="fas fa-key w-5 text-center flex-shrink-0"></i>
+                                <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>System Access</span>
+                                <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Access</span>
+                            </a>
+                        @endif
                     </nav>
                 </div>
 
@@ -152,6 +196,12 @@
                         <a href="{{ route('dashboard') }}" class="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex">
                             User dashboard
                         </a>
+                        <a href="{{ route('notifications.index') }}" class="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex">
+                            Alerts
+                            @if($unreadNotificationCount > 0)
+                                <span class="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadNotificationCount }}</span>
+                            @endif
+                        </a>
 
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-slate-300">
@@ -167,6 +217,10 @@
                                 <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                     <i class="fas fa-user-gear w-4 text-center text-slate-400"></i>
                                     Profile settings
+                                </a>
+                                <a href="{{ route('notifications.index') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                                    <i class="fas fa-bell w-4 text-center text-slate-400"></i>
+                                    Alerts
                                 </a>
                                 <a href="{{ route('dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                     <i class="fas fa-house w-4 text-center text-slate-400"></i>

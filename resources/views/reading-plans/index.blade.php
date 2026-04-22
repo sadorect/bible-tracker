@@ -13,7 +13,7 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">Choose Your Cohort</p>
                     <h3 class="mt-3 text-3xl font-semibold tracking-tight">Join the next faithful stretch of reading, training, and refresh.</h3>
                     <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-200">
-                        Each plan follows the same ministry rhythm: training first, ten focused reading days, then a refresh-and-prayer break before the next cycle begins.
+                        Only cohorts that are currently recruiting or underway appear here. If enrollment is still open, you can join directly whether you registered through an invite link or the normal sign-up flow.
                     </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
@@ -38,17 +38,25 @@
                                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">{{ $plan->type_label }}</p>
                                 <h3 class="mt-2 text-2xl font-semibold text-slate-900">{{ $plan->name }}</h3>
                             </div>
-                            @if($plan->user_has_joined)
+                            @if($plan->user_is_active_participant)
                                 <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                    Enrolled
+                                    Active
+                                </span>
+                            @elseif($plan->user_has_history)
+                                <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                    History
                                 </span>
                             @elseif(!$plan->user_can_join)
                                 <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                                     Locked
                                 </span>
-                            @else
+                            @elseif($plan->isRecruiting())
                                 <span class="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                                    Open
+                                    Recruiting
+                                </span>
+                            @else
+                                <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                    In Progress
                                 </span>
                             @endif
                         </div>
@@ -73,6 +81,10 @@
                                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Reading opens</p>
                                 <p class="mt-2 text-sm font-semibold text-slate-900">{{ $plan->reading_start_date?->format('M d, Y') ?? 'TBD' }}</p>
                             </div>
+                            <div class="rounded-[1.35rem] bg-stone-50 px-4 py-3">
+                                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Enrollment</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-900">{{ $plan->acceptsEnrollment() ? 'Open now' : 'Closed now' }}</p>
+                            </div>
                         </div>
 
                         @if(!$plan->user_can_join && !$plan->user_has_joined)
@@ -86,14 +98,14 @@
                                 View Plan
                             </a>
 
-                            @if(!$plan->user_has_joined && $plan->user_can_join)
+                            @if(!$plan->user_is_active_participant && $plan->user_can_join)
                                 <form action="{{ route('reading-plans.join', $plan->id) }}" method="POST">
                                     @csrf
                                     <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">
-                                        Join Plan
+                                        {{ $plan->user_has_history ? 'Start Fresh Cycle' : 'Join Plan' }}
                                     </button>
                                 </form>
-                            @elseif($plan->user_has_joined)
+                            @elseif($plan->user_is_active_participant)
                                 <a href="{{ route('dashboard') }}" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700">
                                     Go to Dashboard
                                 </a>
@@ -111,5 +123,27 @@
                 </div>
             @endforelse
         </section>
+
+        @if($pastPlans->isNotEmpty())
+            <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Participation history</p>
+                        <h3 class="mt-2 text-2xl font-semibold text-slate-900">Your past cohorts</h3>
+                    </div>
+                    <p class="text-sm text-slate-500">Older plans stay accessible here even after they leave public discovery.</p>
+                </div>
+
+                <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    @foreach($pastPlans as $plan)
+                        <a href="{{ route('reading-plans.show', $plan) }}" class="rounded-[1.5rem] border border-stone-200 bg-stone-50 px-5 py-4 transition hover:border-stone-300 hover:bg-white">
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $plan->type_label }}</p>
+                            <p class="mt-2 text-lg font-semibold text-slate-900">{{ $plan->name }}</p>
+                            <p class="mt-2 text-sm text-slate-500">Joined {{ optional($plan->pivot?->joined_date)->format('M d, Y') ?? 'Previously' }}</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </div>
 </x-app-layout>

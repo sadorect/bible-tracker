@@ -33,8 +33,8 @@
                         <p class="mt-2 text-lg font-semibold">{{ $readingPlan->start_date?->format('M d, Y') ?? 'TBD' }}</p>
                     </div>
                     <div class="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-4">
-                        <p class="text-xs uppercase tracking-[0.2em] text-emerald-100">Scheduled days</p>
-                        <p class="mt-2 text-lg font-semibold">{{ $readingPlan->duration_days }}</p>
+                        <p class="text-xs uppercase tracking-[0.2em] text-emerald-100">Status</p>
+                        <p class="mt-2 text-lg font-semibold">{{ $readingPlan->lifecycle_status_label }}</p>
                     </div>
                 </div>
             </div>
@@ -58,6 +58,10 @@
                     <div class="rounded-[1.35rem] bg-stone-50 px-4 py-4">
                         <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Community</p>
                         <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->users()->count() }} people enrolled</p>
+                    </div>
+                    <div class="rounded-[1.35rem] bg-stone-50 px-4 py-4">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Enrollment</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->acceptsEnrollment() ? 'Open now' : 'Closed now' }}</p>
                     </div>
                 </div>
 
@@ -219,7 +223,7 @@
                             <form action="{{ route('reading-plans.join', $readingPlan) }}" method="POST">
                                 @csrf
                                 <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700">
-                                    Resume Plan
+                                    Start Fresh Cycle
                                 </button>
                             </form>
                         @elseif(!$canJoin)

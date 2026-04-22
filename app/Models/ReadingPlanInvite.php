@@ -69,7 +69,13 @@ class ReadingPlanInvite extends Model
 
     public function isUsable(?Carbon $at = null): bool
     {
-        return ! $this->isRevoked() && ! $this->isExpired($at);
+        $plan = $this->relationLoaded('readingPlan')
+            ? $this->readingPlan
+            : $this->readingPlan()->first();
+
+        return ! $this->isRevoked()
+            && ! $this->isExpired($at)
+            && $plan?->acceptsEnrollment($at);
     }
 
     public function enrollmentUrl(): string

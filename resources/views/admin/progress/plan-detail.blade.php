@@ -14,6 +14,7 @@
                     <h2 class="mt-3 text-3xl font-semibold">{{ $readingPlan->name }}</h2>
                     <p class="mt-2 max-w-2xl text-sm text-slate-200">{{ $readingPlan->description ?: 'No description yet.' }}</p>
                     <p class="mt-3 text-sm text-slate-300">{{ ucfirst(str_replace('_', ' ', $readingPlan->type)) }} · {{ $readingPlan->streak_days }} days on, {{ $readingPlan->break_days }} day break</p>
+                    <p class="mt-3 text-sm text-sky-100">{{ $scopeLabel }}</p>
                 </div>
                 <div class="flex items-end">
                     <a href="{{ route('admin.progress.index') }}" class="inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
@@ -61,7 +62,7 @@
                     </div>
                     <div class="rounded-[1.5rem] bg-slate-50 p-4">
                         <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Status</p>
-                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->is_active ? 'Active' : 'Inactive' }}</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->lifecycle_status_label }}</p>
                     </div>
                     <div class="rounded-[1.5rem] bg-slate-50 p-4">
                         <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Training days</p>

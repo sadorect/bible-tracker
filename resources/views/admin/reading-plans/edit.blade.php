@@ -45,6 +45,18 @@
                                 <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                             @enderror
                         </label>
+
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Lifecycle status</span>
+                            <select name="lifecycle_status" id="lifecycle_status" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500" required>
+                                @foreach($lifecycleStatuses as $value => $label)
+                                    <option value="{{ $value }}" {{ old('lifecycle_status', $readingPlan->lifecycle_status) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('lifecycle_status')
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
                     </div>
 
                     <div class="grid gap-5 md:grid-cols-3">
@@ -90,14 +102,24 @@
                         @enderror
                     </label>
 
-                    <div class="rounded-[1.5rem] bg-slate-50 p-5">
-                        <label class="flex items-center gap-3">
-                            <input type="checkbox" name="is_active" id="is_active" value="1" {{ old('is_active', $readingPlan->is_active) ? 'checked' : '' }} class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <span class="text-sm font-medium text-slate-700">Keep this plan active</span>
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Enrollment opens</span>
+                            <input type="datetime-local" name="enrollment_starts_at" value="{{ old('enrollment_starts_at', optional($readingPlan->enrollment_starts_at)->format('Y-m-d\TH:i')) }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <p class="mt-2 text-xs text-slate-500">Leave blank to allow enrollments as soon as this plan becomes visible.</p>
+                            @error('enrollment_starts_at')
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
                         </label>
-                        @error('is_active')
-                            <p class="mt-3 text-sm text-rose-600">{{ $message }}</p>
-                        @enderror
+
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700">Enrollment closes</span>
+                            <input type="datetime-local" name="enrollment_ends_at" value="{{ old('enrollment_ends_at', optional($readingPlan->enrollment_ends_at)->format('Y-m-d\TH:i')) }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <p class="mt-2 text-xs text-slate-500">Leave blank to keep recruitment open while the plan is live.</p>
+                            @error('enrollment_ends_at')
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </label>
                     </div>
 
                     <label class="block">
@@ -135,6 +157,19 @@
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Commencement</p>
                             <p class="mt-2 text-sm font-semibold text-slate-900">{{ \Carbon\Carbon::parse($readingPlan->start_date)->format('M d, Y') }}</p>
                         </div>
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Lifecycle</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->lifecycle_status_label }}</p>
+                        </div>
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Enrollment window</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">
+                                {{ $readingPlan->enrollment_starts_at?->format('M d, Y g:i A') ?? 'Open with status' }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-500">
+                                Until {{ $readingPlan->enrollment_ends_at?->format('M d, Y g:i A') ?? 'status changes or admin closes it' }}
+                            </p>
+                        </div>
                     </div>
                 </section>
 
@@ -153,6 +188,12 @@
                     <h2 class="mt-2 text-2xl font-semibold text-slate-900">Generate an enrollment link</h2>
                     <p class="mt-2 text-sm leading-6 text-slate-500">Links can be shared publicly, do not have a usage cap, and can be revoked at any time. Returning participants can use them to start fresh cycles on the same profile.</p>
                 </div>
+
+                @unless($readingPlan->acceptsEnrollment())
+                    <div class="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                        Enrollment links can only be created while the plan is visible and currently accepting enrollments.
+                    </div>
+                @endunless
 
                 <form method="POST" action="{{ route('admin.reading-plans.invites.store', $readingPlan) }}" class="mt-6 grid gap-5 md:grid-cols-2">
                     @csrf
@@ -174,7 +215,7 @@
                     </label>
 
                     <div class="md:col-span-2 flex justify-end">
-                        <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        <button type="submit" {{ $readingPlan->acceptsEnrollment() ? '' : 'disabled' }} class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
                             Generate enrollment link
                         </button>
                     </div>
@@ -196,7 +237,7 @@
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $invite->isUsable() ? 'bg-emerald-100 text-emerald-700' : ($invite->isRevoked() ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') }}">
-                                        {{ $invite->isUsable() ? 'Active' : ($invite->isRevoked() ? 'Revoked' : 'Expired') }}
+                                        {{ $invite->isUsable() ? 'Usable' : ($invite->isRevoked() ? 'Revoked' : 'Unavailable') }}
                                     </span>
                                     @if($invite->label)
                                         <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{{ $invite->label }}</span>

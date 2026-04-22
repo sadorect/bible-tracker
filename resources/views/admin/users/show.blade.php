@@ -138,6 +138,38 @@
                 </section>
 
                 <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">System access</p>
+                    <div class="mt-5 space-y-4">
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Admin console access</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->canAccessAdminPanel() ? 'Granted' : 'Not granted' }}</p>
+                        </div>
+
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Assigned access roles</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                @forelse($user->systemRoles as $systemRole)
+                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{{ $systemRole->name }}</span>
+                                @empty
+                                    <span class="text-sm text-slate-500">No system roles assigned.</span>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Effective permissions</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                @forelse($user->permissionNames() as $permission)
+                                    <span class="rounded-full bg-white px-3 py-1 font-mono text-xs text-slate-700">{{ $permission }}</span>
+                                @empty
+                                    <span class="text-sm text-slate-500">No system permissions granted.</span>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Activity feed</p>
                         <h2 class="mt-2 text-2xl font-semibold text-slate-900">Recent completions</h2>

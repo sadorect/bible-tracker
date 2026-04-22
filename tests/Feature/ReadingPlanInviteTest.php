@@ -134,18 +134,45 @@ class ReadingPlanInviteTest extends TestCase
         $this->assertNotNull($invite->fresh()->revoked_at);
     }
 
-    private function makePlan(): ReadingPlan
+    public function test_invite_is_not_usable_when_plan_is_no_longer_accepting_enrollment(): void
     {
-        return ReadingPlan::create([
+        $user = User::factory()->create();
+        $plan = $this->makePlan([
+            'lifecycle_status' => ReadingPlan::STATUS_CLOSED,
+            'is_active' => false,
+            'enrollment_ends_at' => now()->subMinute(),
+        ]);
+        $invite = ReadingPlanInvite::create([
+            'reading_plan_id' => $plan->id,
+            'token' => 'closed-plan-token',
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('reading-plan-invites.accept', $invite->token))
+            ->assertRedirect(route('reading-plan-invites.show', $invite->token));
+
+        $this->assertDatabaseMissing('reading_plan_participations', [
+            'user_id' => $user->id,
+            'reading_plan_id' => $plan->id,
+        ]);
+    }
+
+    private function makePlan(array $overrides = []): ReadingPlan
+    {
+        return ReadingPlan::create(array_merge([
             'name' => 'Invite Cohort',
             'type' => ReadingPlan::TYPE_NEW_TESTAMENT,
+            'lifecycle_status' => ReadingPlan::STATUS_ACTIVE,
             'description' => 'Invite cohort description',
             'chapters_per_day' => 9,
             'streak_days' => 10,
             'break_days' => 1,
             'start_date' => Carbon::today(),
             'end_date' => Carbon::today()->addDays(30),
+            'enrollment_starts_at' => Carbon::now()->subDay(),
+            'enrollment_ends_at' => Carbon::now()->addDays(7),
             'is_active' => true,
-        ]);
+        ], $overrides));
     }
 }

@@ -5,254 +5,66 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ReadingPlan;
 use App\Models\ReadingProgress;
+use App\Models\ReportPreset;
 use App\Models\User;
+use App\Services\Auditing\AuditLogger;
+use App\Services\Messaging\UserProgressSnapshotService;
+use App\Services\Reports\ProgressReportScope;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class UserProgressController extends Controller
 {
-    /**
-     * Display the user progress dashboard.
-     */
+    public function __construct(
+        private readonly ProgressReportScope $reportScope,
+        private readonly UserProgressSnapshotService $snapshotService,
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     public function index(Request $request)
     {
-        // Get filter parameters
-        $userId = $request->input('user_id');
-        $planId = $request->input('plan_id');
-        $dateRange = $request->input('date_range', 'all');
+        $actor = $request->user();
+        $filters = $this->filtersFromRequest($request);
+        $scopeData = $this->scopeData($actor, $filters);
+        $progressQuery = $this->progressQuery($filters, $scopeData);
 
-        // Get all users for the filter dropdown
-        $users = User::orderBy('name')->get();
-
-        // Get all reading plans for the filter dropdown
-        $readingPlans = ReadingPlan::orderBy('name')->get();
-
-        // Build the base query for reading progress
-        $progressQuery = ReadingProgress::with(['user', 'readingPlan', 'dailyReading'])
-            ->select('reading_progress.*')
-            ->join('users', 'users.id', '=', 'reading_progress.user_id')
-            ->join('reading_plans', 'reading_plans.id', '=', 'reading_progress.reading_plan_id');
-
-        // Apply filters
-        if ($userId) {
-            $progressQuery->where('user_id', $userId);
-        }
-
-        if ($planId) {
-            $progressQuery->where('reading_plan_id', $planId);
-        }
-
-        // Apply date range filter
-        if ($dateRange !== 'all') {
-            $startDate = null;
-            $endDate = Carbon::today();
-
-            switch ($dateRange) {
-                case 'today':
-                    $startDate = Carbon::today();
-                    break;
-                case 'yesterday':
-                    $startDate = Carbon::yesterday();
-                    $endDate = Carbon::yesterday();
-                    break;
-                case 'this_week':
-                    $startDate = Carbon::now()->startOfWeek();
-                    break;
-                case 'last_week':
-                    $startDate = Carbon::now()->subWeek()->startOfWeek();
-                    $endDate = Carbon::now()->subWeek()->endOfWeek();
-                    break;
-                case 'this_month':
-                    $startDate = Carbon::now()->startOfMonth();
-                    break;
-                case 'last_month':
-                    $startDate = Carbon::now()->subMonth()->startOfMonth();
-                    $endDate = Carbon::now()->subMonth()->endOfMonth();
-                    break;
-                case 'custom':
-                    $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : null;
-                    $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date')) : Carbon::today();
-                    break;
-            }
-
-            if ($startDate) {
-                $progressQuery->whereBetween('reading_progress.completed_date', [$startDate, $endDate]);
-            }
-        }
-
-        // Get paginated results
-        $progress = $progressQuery->orderBy('reading_progress.completed_date', 'desc')
+        $progress = $progressQuery
+            ->orderByDesc('reading_progress.completed_date')
             ->paginate(15)
             ->withQueryString();
 
-        // Get summary statistics
-        $stats = $this->getProgressStats($userId, $planId, $dateRange, $request);
-
-        return view('admin.progress.index', compact(
-            'users',
-            'readingPlans',
-            'progress',
-            'stats',
-            'userId',
-            'planId',
-            'dateRange'
-        ));
+        return view('admin.progress.index', [
+            'users' => $scopeData['users'],
+            'readingPlans' => $scopeData['plans'],
+            'hierarchies' => $scopeData['hierarchies'],
+            'progress' => $progress,
+            'stats' => $this->buildStats($filters, $scopeData),
+            'filters' => $filters,
+            'scopeLabel' => $this->reportScope->scopeLabel($actor),
+            'isScopedToHierarchy' => ! $this->reportScope->isGlobal($actor),
+            'roleOptions' => User::roleOptions(),
+            'paceStatusOptions' => $this->paceStatusOptions(),
+            'trainingStatusOptions' => $this->trainingStatusOptions(),
+            'reportPresets' => $actor->reportPresets()->latest()->get(),
+            'reportTypeOptions' => $this->reportTypeOptions(),
+        ]);
     }
 
-    /**
-     * Get progress statistics for the dashboard
-     */
-    private function getProgressStats($userId, $planId, $dateRange, Request $request)
+    public function userDetail(Request $request, User $user)
     {
-        // Build base query
-        $query = ReadingProgress::query();
+        $actor = $request->user();
 
-        // Apply filters
-        if ($userId) {
-            $query->where('user_id', $userId);
-        }
+        abort_unless($this->reportScope->canAccessUser($actor, $user), 403);
 
-        if ($planId) {
-            $query->where('reading_plan_id', $planId);
-        }
-
-        // Apply date range filter
-        if ($dateRange !== 'all') {
-            $startDate = null;
-            $endDate = Carbon::today();
-
-            switch ($dateRange) {
-                case 'today':
-                    $startDate = Carbon::today();
-                    break;
-                case 'yesterday':
-                    $startDate = Carbon::yesterday();
-                    $endDate = Carbon::yesterday();
-                    break;
-                case 'this_week':
-                    $startDate = Carbon::now()->startOfWeek();
-                    break;
-                case 'last_week':
-                    $startDate = Carbon::now()->subWeek()->startOfWeek();
-                    $endDate = Carbon::now()->subWeek()->endOfWeek();
-                    break;
-                case 'this_month':
-                    $startDate = Carbon::now()->startOfMonth();
-                    break;
-                case 'last_month':
-                    $startDate = Carbon::now()->subMonth()->startOfMonth();
-                    $endDate = Carbon::now()->subMonth()->endOfMonth();
-                    break;
-                case 'custom':
-                    $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : null;
-                    $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date')) : Carbon::today();
-                    break;
-            }
-
-            if ($startDate) {
-                $query->whereBetween('completed_date', [$startDate, $endDate]);
-            }
-        }
-
-        // Total completions
-        $totalCompletions = $query->count();
-
-        // Completions by user
-        $completionsByUser = ReadingProgress::select('users.id', 'users.name', DB::raw('count(*) as count'))
-            ->join('users', 'users.id', '=', 'reading_progress.user_id')
-            ->groupBy('users.id', 'users.name')
-            ->orderByDesc('count')
-            ->limit(5);
-
-        // Apply filters to the completions by user query
-        if ($planId) {
-            $completionsByUser->where('reading_plan_id', $planId);
-        }
-
-        if ($dateRange !== 'all' && isset($startDate)) {
-            $completionsByUser->whereBetween('completed_date', [$startDate, $endDate]);
-        }
-
-        $completionsByUser = $completionsByUser->get();
-
-        // Completions by plan
-        $completionsByPlan = ReadingProgress::select('reading_plans.id', 'reading_plans.name', DB::raw('count(*) as count'))
-            ->join('reading_plans', 'reading_plans.id', '=', 'reading_progress.reading_plan_id')
-            ->groupBy('reading_plans.id', 'reading_plans.name')
-            ->orderByDesc('count')
-            ->limit(5);
-
-        // Apply filters to the completions by plan query
-        if ($userId) {
-            $completionsByPlan->where('user_id', $userId);
-        }
-
-        if ($dateRange !== 'all' && isset($startDate)) {
-            $completionsByPlan->whereBetween('completed_date', [$startDate, $endDate]);
-        }
-
-        $completionsByPlan = $completionsByPlan->get();
-
-        // Completions by day (for chart)
-        $completionsByDay = ReadingProgress::select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
-            ->groupBy('date')
-            ->orderBy('date');
-
-        // Apply filters to the completions by day query
-        if ($userId) {
-            $completionsByDay->where('user_id', $userId);
-        }
-
-        if ($planId) {
-            $completionsByDay->where('reading_plan_id', $planId);
-        }
-
-        // Limit to last 30 days if no date range specified
-        if ($dateRange === 'all') {
-            $completionsByDay->where('completed_date', '>=', Carbon::now()->subDays(30));
-        } elseif (isset($startDate)) {
-            $completionsByDay->whereBetween('completed_date', [$startDate, $endDate]);
-        }
-
-        $completionsByDay = $completionsByDay->get();
-
-        // Format for chart
-        $chartLabels = $completionsByDay->pluck('date')->toJson();
-        $chartData = $completionsByDay->pluck('count')->toJson();
-
-        // Active users count
-        $activeUsers = User::whereHas('readingPlans', function ($query) {
-            $query->where('user_reading_plans.is_active', true);
-        })->count();
-
-        // Active plans count
-        $activePlans = ReadingPlan::where('is_active', true)->count();
-
-        return [
-            'total_completions' => $totalCompletions,
-            'completions_by_user' => $completionsByUser,
-            'completions_by_plan' => $completionsByPlan,
-            'chart_labels' => $chartLabels,
-            'chart_data' => $chartData,
-            'active_users' => $activeUsers,
-            'active_plans' => $activePlans,
-        ];
-    }
-
-    /**
-     * View detailed progress for a specific user
-     */
-    public function userDetail(User $user)
-    {
-        // Get all reading plans the user is part of
         $userPlans = $user->readingPlans;
-
-        // Get overall statistics
         $totalCompletions = $user->readingProgress()->count();
         $currentStreak = $user->readingPlans()->wherePivot('is_active', true)->first()?->pivot->current_streak ?? 0;
 
-        // Get completion rate for each plan
         $planStats = [];
         foreach ($userPlans as $plan) {
             $totalDays = $plan->dailyReadings()->where('is_break_day', false)->count();
@@ -269,51 +81,52 @@ class UserProgressController extends Controller
             ];
         }
 
-        // Get recent activity
         $recentActivity = $user->readingProgress()
             ->with(['readingPlan', 'dailyReading'])
             ->orderByDesc('completed_date')
             ->limit(10)
             ->get();
 
-        // Get completion trend (last 30 days)
-        $completionTrend = ReadingProgress::select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
+        $completionTrend = ReadingProgress::query()
+            ->select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
             ->where('user_id', $user->id)
             ->where('completed_date', '>=', Carbon::now()->subDays(30))
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        // Format for chart
-        $chartLabels = $completionTrend->pluck('date')->toJson();
-        $chartData = $completionTrend->pluck('count')->toJson();
-
-        return view('admin.progress.user-detail', compact(
-            'user',
-            'userPlans',
-            'totalCompletions',
-            'currentStreak',
-            'planStats',
-            'recentActivity',
-            'chartLabels',
-            'chartData'
-        ));
+        return view('admin.progress.user-detail', [
+            'user' => $user,
+            'userPlans' => $userPlans,
+            'totalCompletions' => $totalCompletions,
+            'currentStreak' => $currentStreak,
+            'planStats' => $planStats,
+            'recentActivity' => $recentActivity,
+            'chartLabels' => $completionTrend->pluck('date')->toJson(),
+            'chartData' => $completionTrend->pluck('count')->toJson(),
+            'scopeLabel' => $this->reportScope->scopeLabel($actor),
+            'isScopedToHierarchy' => ! $this->reportScope->isGlobal($actor),
+        ]);
     }
 
-    /**
-     * View detailed progress for a specific plan
-     */
-    public function planDetail(ReadingPlan $readingPlan)
+    public function planDetail(Request $request, ReadingPlan $readingPlan)
     {
-        // Get all users in this plan
-        $planUsers = $readingPlan->users;
+        $actor = $request->user();
 
-        // Get overall statistics
-        $totalCompletions = ReadingProgress::where('reading_plan_id', $readingPlan->id)->count();
+        abort_unless($this->reportScope->canAccessPlan($actor, $readingPlan), 403);
+
+        $scopedUserIds = $this->reportScope->accessibleUsers($actor)->pluck('id');
+        $planUsers = $readingPlan->users()
+            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('users.id', $scopedUserIds))
+            ->get();
+
+        $totalCompletions = ReadingProgress::query()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
+            ->count();
         $totalUsers = $planUsers->count();
         $activeUsers = $planUsers->where('pivot.is_active', true)->count();
 
-        // Get completion rate for each user
         $userStats = [];
         foreach ($planUsers as $user) {
             $totalDays = $readingPlan->dailyReadings()->where('is_break_day', false)->count();
@@ -331,146 +144,540 @@ class UserProgressController extends Controller
             ];
         }
 
-        // Sort by completion rate (descending)
-        usort($userStats, function ($a, $b) {
-            return $b['completion_rate'] <=> $a['completion_rate'];
-        });
+        usort($userStats, fn ($a, $b) => $b['completion_rate'] <=> $a['completion_rate']);
 
-        // Get recent activity
-        $recentActivity = ReadingProgress::with(['user', 'dailyReading'])
+        $recentActivity = ReadingProgress::query()
+            ->with(['user', 'dailyReading'])
             ->where('reading_plan_id', $readingPlan->id)
+            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
             ->orderByDesc('completed_date')
             ->limit(10)
             ->get();
 
-        // Get completion trend (last 30 days)
-        $completionTrend = ReadingProgress::select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
+        $completionTrend = ReadingProgress::query()
+            ->select(DB::raw('DATE(completed_date) as date'), DB::raw('count(*) as count'))
             ->where('reading_plan_id', $readingPlan->id)
+            ->when($scopedUserIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('user_id', $scopedUserIds))
             ->where('completed_date', '>=', Carbon::now()->subDays(30))
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        // Format for chart
-        $chartLabels = $completionTrend->pluck('date')->toJson();
-        $chartData = $completionTrend->pluck('count')->toJson();
-
-        return view('admin.progress.plan-detail', compact(
-            'readingPlan',
-            'planUsers',
-            'totalCompletions',
-            'totalUsers',
-            'activeUsers',
-            'userStats',
-            'recentActivity',
-            'chartLabels',
-            'chartData'
-        ));
+        return view('admin.progress.plan-detail', [
+            'readingPlan' => $readingPlan,
+            'planUsers' => $planUsers,
+            'totalCompletions' => $totalCompletions,
+            'totalUsers' => $totalUsers,
+            'activeUsers' => $activeUsers,
+            'userStats' => $userStats,
+            'recentActivity' => $recentActivity,
+            'chartLabels' => $completionTrend->pluck('date')->toJson(),
+            'chartData' => $completionTrend->pluck('count')->toJson(),
+            'scopeLabel' => $this->reportScope->scopeLabel($actor),
+            'isScopedToHierarchy' => ! $this->reportScope->isGlobal($actor),
+        ]);
     }
 
-    /**
-     * Export progress data as CSV
-     */
     public function export(Request $request)
     {
-        // Get filter parameters
-        $userId = $request->input('user_id');
-        $planId = $request->input('plan_id');
-        $dateRange = $request->input('date_range', 'all');
+        $actor = $request->user();
+        $filters = $this->filtersFromRequest($request);
+        $scopeData = $this->scopeData($actor, $filters);
+        $reportType = $request->string('report_type')->toString() ?: 'detail';
+        $progress = $this->progressQuery($filters, $scopeData)
+            ->orderByDesc('reading_progress.completed_date')
+            ->get();
 
-        // Build the base query for reading progress
-        $progressQuery = ReadingProgress::with(['user', 'readingPlan', 'dailyReading'])
-            ->select('reading_progress.*', 'users.name as user_name', 'reading_plans.name as plan_name')
+        $format = $request->string('format')->toString() ?: 'csv';
+        $filenameBase = 'reading_progress_'.Carbon::now()->format('Y-m-d_His');
+        $snapshotMap = $this->snapshotMapForUsers($progress->pluck('user')->filter()->unique('id')->values());
+        $rows = $reportType === 'hierarchy_summary'
+            ? $this->hierarchySummaryRows($filters, $scopeData, $snapshotMap)
+            : $this->exportRows($progress, $snapshotMap);
+
+        $this->auditLogger->log(
+            'reports.exported',
+            $actor,
+            null,
+            [
+                'filters' => array_filter($filters, fn ($value) => $value !== '' && $value !== 0),
+                'format' => $format,
+                'report_type' => $reportType,
+                'row_count' => count($rows),
+                'scope_label' => $scopeData['scope_label'],
+            ],
+            "Exported a {$format} {$reportType} report covering {$scopeData['scope_label']}.",
+        );
+
+        return match ($format) {
+            'excel' => $this->excelResponse($rows, "{$filenameBase}.xls"),
+            'pdf' => $this->pdfResponse($rows, $filters, $scopeData, $reportType, "{$filenameBase}.pdf"),
+            default => $this->csvResponse($rows, "{$filenameBase}.csv"),
+        };
+    }
+
+    public function storePreset(Request $request)
+    {
+        $actor = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $actor->reportPresets()->create([
+            'name' => $validated['name'],
+            'filters' => $this->filtersFromRequest($request),
+        ]);
+
+        return redirect()->route('admin.progress.index', $this->filtersFromRequest($request))
+            ->with('success', 'Report preset saved successfully.');
+    }
+
+    public function destroyPreset(Request $request, ReportPreset $reportPreset)
+    {
+        abort_unless($reportPreset->user_id === $request->user()->id, 403);
+
+        $reportPreset->delete();
+
+        return back()->with('success', 'Report preset deleted successfully.');
+    }
+
+    private function filtersFromRequest(Request $request): array
+    {
+        return [
+            'user_id' => $request->integer('user_id'),
+            'plan_id' => $request->integer('plan_id'),
+            'hierarchy_id' => $request->integer('hierarchy_id'),
+            'role' => $request->string('role')->toString(),
+            'pace_status' => $request->string('pace_status')->toString(),
+            'training_status' => $request->string('training_status')->toString(),
+            'date_range' => $request->string('date_range')->toString() ?: 'all',
+            'start_date' => $request->string('start_date')->toString(),
+            'end_date' => $request->string('end_date')->toString(),
+        ];
+    }
+
+    private function scopeData(User $actor, array $filters): array
+    {
+        $users = $this->reportScope->accessibleUsers($actor);
+        $plans = $this->reportScope->accessiblePlans($actor);
+        $hierarchies = $this->reportScope->accessibleHierarchies($actor);
+        $derivedUserIds = $this->reportScope->accessibleUserIdsMatchingDerivedFilters($actor, $filters);
+
+        return [
+            'users' => $users,
+            'user_ids' => $users->pluck('id')->all(),
+            'plans' => $plans,
+            'hierarchies' => $hierarchies,
+            'derived_user_ids' => $derivedUserIds,
+            'scope_label' => $this->reportScope->scopeLabel($actor),
+        ];
+    }
+
+    private function progressQuery(array $filters, array $scopeData): Builder
+    {
+        $query = ReadingProgress::query()
+            ->with(['user.hierarchy.parent', 'readingPlan', 'dailyReading'])
+            ->select('reading_progress.*')
             ->join('users', 'users.id', '=', 'reading_progress.user_id')
             ->join('reading_plans', 'reading_plans.id', '=', 'reading_progress.reading_plan_id');
 
-        // Apply filters
-        if ($userId) {
-            $progressQuery->where('user_id', $userId);
+        if ($scopeData['user_ids'] === []) {
+            return $query->whereRaw('1 = 0');
         }
 
-        if ($planId) {
-            $progressQuery->where('reading_plan_id', $planId);
-        }
+        $query->whereIn('reading_progress.user_id', $scopeData['user_ids']);
 
-        // Apply date range filter
-        if ($dateRange !== 'all') {
-            $startDate = null;
-            $endDate = Carbon::today();
-
-            switch ($dateRange) {
-                case 'today':
-                    $startDate = Carbon::today();
-                    break;
-                case 'yesterday':
-                    $startDate = Carbon::yesterday();
-                    $endDate = Carbon::yesterday();
-                    break;
-                case 'this_week':
-                    $startDate = Carbon::now()->startOfWeek();
-                    break;
-                case 'last_week':
-                    $startDate = Carbon::now()->subWeek()->startOfWeek();
-                    $endDate = Carbon::now()->subWeek()->endOfWeek();
-                    break;
-                case 'this_month':
-                    $startDate = Carbon::now()->startOfMonth();
-                    break;
-                case 'last_month':
-                    $startDate = Carbon::now()->subMonth()->startOfMonth();
-                    $endDate = Carbon::now()->subMonth()->endOfMonth();
-                    break;
-                case 'custom':
-                    $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : null;
-                    $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date')) : Carbon::today();
-                    break;
+        if (is_array($scopeData['derived_user_ids'])) {
+            if ($scopeData['derived_user_ids'] === []) {
+                return $query->whereRaw('1 = 0');
             }
 
-            if ($startDate) {
-                $progressQuery->whereBetween('reading_progress.completed_date', [$startDate, $endDate]);
-            }
+            $query->whereIn('reading_progress.user_id', $scopeData['derived_user_ids']);
         }
 
-        // Get all results for export
-        $progress = $progressQuery->orderBy('reading_progress.completed_date', 'desc')->get();
+        if ($filters['user_id'] > 0) {
+            $query->where('reading_progress.user_id', $filters['user_id']);
+        }
 
-        // Generate CSV filename
-        $filename = 'reading_progress_'.Carbon::now()->format('Y-m-d').'.csv';
+        if ($filters['plan_id'] > 0) {
+            $query->where('reading_progress.reading_plan_id', $filters['plan_id']);
+        }
 
-        // Create CSV response
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        if ($filters['hierarchy_id'] > 0) {
+            $query->where('users.hierarchy_id', $filters['hierarchy_id']);
+        }
+
+        if ($filters['role'] !== '') {
+            $query->where('users.role', $filters['role']);
+        }
+
+        [$startDate, $endDate] = $this->resolveDateRange($filters);
+
+        if ($startDate) {
+            $query->whereBetween('reading_progress.completed_date', [$startDate, $endDate]);
+        }
+
+        return $query;
+    }
+
+    private function buildStats(array $filters, array $scopeData): array
+    {
+        $baseQuery = $this->progressQuery($filters, $scopeData);
+        $totalCompletions = (clone $baseQuery)->count();
+
+        $completionsByUser = (clone $baseQuery)
+            ->select('users.id', 'users.name', DB::raw('count(*) as count'))
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+
+        $completionsByPlan = (clone $baseQuery)
+            ->select('reading_plans.id', 'reading_plans.name', DB::raw('count(*) as count'))
+            ->groupBy('reading_plans.id', 'reading_plans.name')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+
+        $completionsByDay = (clone $baseQuery)
+            ->select(DB::raw('DATE(reading_progress.completed_date) as date'), DB::raw('count(*) as count'))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->when($filters['date_range'] === 'all', fn (Builder $query) => $query->where('reading_progress.completed_date', '>=', Carbon::now()->subDays(30)))
+            ->get();
+
+        $activeUsers = User::query()
+            ->when($scopeData['user_ids'] === [], fn (Builder $query) => $query->whereRaw('1 = 0'))
+            ->whereIn('id', $scopeData['user_ids'])
+            ->when(is_array($scopeData['derived_user_ids']), fn (Builder $query) => $query->whereIn('id', $scopeData['derived_user_ids']))
+            ->when($filters['hierarchy_id'] > 0, fn (Builder $query) => $query->where('hierarchy_id', $filters['hierarchy_id']))
+            ->when($filters['role'] !== '', fn (Builder $query) => $query->where('role', $filters['role']))
+            ->whereHas('readingPlans', fn (Builder $query) => $query->where('user_reading_plans.is_active', true))
+            ->count();
+
+        $activePlans = ReadingPlan::query()
+            ->whereHas('readingProgress', function (Builder $query) use ($scopeData, $filters) {
+                $query->whereIn('user_id', $scopeData['user_ids']);
+
+                if (is_array($scopeData['derived_user_ids'])) {
+                    $query->whereIn('user_id', $scopeData['derived_user_ids']);
+                }
+
+                if ($filters['user_id'] > 0) {
+                    $query->where('user_id', $filters['user_id']);
+                }
+            })
+            ->count();
+
+        return [
+            'total_completions' => $totalCompletions,
+            'completions_by_user' => $completionsByUser,
+            'completions_by_plan' => $completionsByPlan,
+            'chart_labels' => $completionsByDay->pluck('date')->toJson(),
+            'chart_data' => $completionsByDay->pluck('count')->toJson(),
+            'active_users' => $activeUsers,
+            'active_plans' => $activePlans,
         ];
+    }
 
-        $callback = function () use ($progress) {
+    private function resolveDateRange(array $filters): array
+    {
+        $startDate = null;
+        $endDate = Carbon::today();
+
+        switch ($filters['date_range']) {
+            case 'today':
+                $startDate = Carbon::today();
+                break;
+            case 'yesterday':
+                $startDate = Carbon::yesterday();
+                $endDate = Carbon::yesterday();
+                break;
+            case 'this_week':
+                $startDate = Carbon::now()->startOfWeek();
+                break;
+            case 'last_week':
+                $startDate = Carbon::now()->subWeek()->startOfWeek();
+                $endDate = Carbon::now()->subWeek()->endOfWeek();
+                break;
+            case 'this_month':
+                $startDate = Carbon::now()->startOfMonth();
+                break;
+            case 'last_month':
+                $startDate = Carbon::now()->subMonth()->startOfMonth();
+                $endDate = Carbon::now()->subMonth()->endOfMonth();
+                break;
+            case 'custom':
+                $startDate = $filters['start_date'] !== '' ? Carbon::parse($filters['start_date']) : null;
+                $endDate = $filters['end_date'] !== '' ? Carbon::parse($filters['end_date']) : Carbon::today();
+                break;
+        }
+
+        return [$startDate, $endDate];
+    }
+
+    private function snapshotMapForUsers(Collection $users): Collection
+    {
+        return $users
+            ->each(function (User $user) {
+                $user->loadMissing([
+                    'hierarchy.parent',
+                    'readingPlans.trainingResources',
+                    'readingPlans.dailyReadings',
+                    'readingProgress.dailyReading',
+                    'trainingCompletions',
+                ]);
+            })
+            ->mapWithKeys(fn (User $user) => [$user->id => $this->snapshotService->build($user)]);
+    }
+
+    private function exportRows(Collection $progress, Collection $snapshotMap): array
+    {
+        return $progress->map(function (ReadingProgress $record) use ($snapshotMap) {
+            $snapshot = $snapshotMap->get($record->user_id, []);
+
+            return [
+                'User' => $record->user?->name ?? 'Unknown',
+                'Email' => $record->user?->email ?? '',
+                'Role' => $record->user?->roleLabel() ?? '',
+                'Group' => $record->user?->hierarchy?->displayPath() ?? 'Unassigned',
+                'Reading Plan' => $record->readingPlan?->name ?? '',
+                'Plan Type' => $record->readingPlan?->type_label ?? '',
+                'Reading' => $record->dailyReading?->reading_range ?? '',
+                'Completed Date' => optional($record->completed_date)->format('Y-m-d') ?? '',
+                'Pace Status' => $snapshot['status_label'] ?? '',
+                'Training Status' => $snapshot['training_status'] ?? '',
+                'Training Progress' => $snapshot['training_progress'] ?? '',
+                'Expected Day' => $snapshot['expected_day'] ?? '',
+                'Completed Days' => $snapshot['completed_days'] ?? '',
+                'Ahead Days' => $snapshot['ahead_days'] ?? '',
+                'Behind Days' => $snapshot['behind_days'] ?? '',
+                'Last Completion Date' => isset($snapshot['last_completion_date']) && $snapshot['last_completion_date']
+                    ? Carbon::parse($snapshot['last_completion_date'])->format('Y-m-d')
+                    : '',
+            ];
+        })->all();
+    }
+
+    private function hierarchySummaryRows(array $filters, array $scopeData, Collection $snapshotMap): array
+    {
+        $users = $this->filteredUsersForSummary($filters, $scopeData);
+        $usersByHierarchy = $users->groupBy(fn (User $user) => $user->hierarchy_id ?: 'unassigned');
+        $completionCounts = $this->progressQuery($filters, $scopeData)
+            ->select('users.hierarchy_id', DB::raw('count(*) as total'))
+            ->groupBy('users.hierarchy_id')
+            ->pluck('total', 'users.hierarchy_id');
+
+        return $usersByHierarchy->map(function (Collection $members, $hierarchyKey) use ($completionCounts, $snapshotMap) {
+            $hierarchy = $members->first()?->hierarchy;
+            $snapshots = $members->map(fn (User $user) => $snapshotMap->get($user->id));
+            $activePlanCount = $members
+                ->map(fn (User $user) => $user->activeReadingPlanFromLoaded()?->id)
+                ->filter()
+                ->unique()
+                ->count();
+            $memberCount = $members->where('role', User::ROLE_MEMBER)->count();
+            $leaderCount = $members->count() - $memberCount;
+            $completionTotal = (int) ($completionCounts[$hierarchy?->id] ?? ($hierarchyKey === 'unassigned' ? ($completionCounts[null] ?? 0) : 0));
+
+            return [
+                'Hierarchy' => $hierarchy?->displayPath() ?? 'Unassigned',
+                'Hierarchy Type' => $hierarchy ? ucfirst($hierarchy->type) : 'None',
+                'Leader' => $hierarchy?->leader?->name ?? 'No assigned leader',
+                'People' => $members->count(),
+                'Members' => $memberCount,
+                'Leaders' => $leaderCount,
+                'Active Plans' => $activePlanCount,
+                'Total Completions' => $completionTotal,
+                'Avg Completions Per Person' => $members->isNotEmpty() ? number_format($completionTotal / $members->count(), 1) : '0.0',
+                'In Training' => $snapshots->where('status_key', 'in_training')->count(),
+                'Awaiting Start' => $snapshots->where('status_key', 'awaiting_start')->count(),
+                'Catching Up' => $snapshots->where('status_key', 'catching_up')->count(),
+                'On Track' => $snapshots->where('status_key', 'on_track')->count(),
+                'Reading Ahead' => $snapshots->where('status_key', 'reading_ahead')->count(),
+                'No Active Plan' => $snapshots->where('status_key', 'no_active_plan')->count(),
+            ];
+        })->values()->all();
+    }
+
+    private function csvResponse(array $rows, string $filename)
+    {
+        return response()->streamDownload(function () use ($rows) {
             $file = fopen('php://output', 'w');
 
-            // Add CSV headers
-            fputcsv($file, [
-                'User',
-                'Reading Plan',
-                'Reading',
-                'Completed Date',
-                'Completed Time',
-            ]);
+            fputcsv($file, array_keys($rows[0] ?? [
+                'User' => '',
+                'Email' => '',
+                'Role' => '',
+                'Group' => '',
+                'Reading Plan' => '',
+                'Plan Type' => '',
+                'Reading' => '',
+                'Completed Date' => '',
+                'Pace Status' => '',
+                'Training Status' => '',
+                'Training Progress' => '',
+                'Expected Day' => '',
+                'Completed Days' => '',
+                'Ahead Days' => '',
+                'Behind Days' => '',
+                'Last Completion Date' => '',
+            ]));
 
-            // Add data rows
-            foreach ($progress as $record) {
-                $completedDate = Carbon::parse($record->completed_date);
-
-                fputcsv($file, [
-                    $record->user_name,
-                    $record->plan_name,
-                    $record->dailyReading?->reading_range,
-                    $completedDate->format('Y-m-d'),
-                    $completedDate->format('H:i:s'),
-                ]);
+            foreach ($rows as $row) {
+                fputcsv($file, $row);
             }
 
             fclose($file);
-        };
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
 
-        return response()->stream($callback, 200, $headers);
+    private function excelResponse(array $rows, string $filename)
+    {
+        $headers = array_keys($rows[0] ?? [
+            'User' => '',
+            'Email' => '',
+            'Role' => '',
+            'Group' => '',
+            'Reading Plan' => '',
+            'Plan Type' => '',
+            'Reading' => '',
+            'Completed Date' => '',
+            'Pace Status' => '',
+            'Training Status' => '',
+            'Training Progress' => '',
+            'Expected Day' => '',
+            'Completed Days' => '',
+            'Ahead Days' => '',
+            'Behind Days' => '',
+            'Last Completion Date' => '',
+        ]);
+
+        $xml = collect($headers)->map(fn (string $header) => $this->excelCell($header, 'String'))->implode('');
+        $headerRow = "<Row>{$xml}</Row>";
+        $dataRows = collect($rows)->map(function (array $row) {
+            $cells = collect($row)->map(fn ($value) => $this->excelCell((string) $value, 'String'))->implode('');
+
+            return "<Row>{$cells}</Row>";
+        })->implode('');
+
+        $content = <<<XML
+<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+    <Worksheet ss:Name="Progress Report">
+        <Table>
+            {$headerRow}
+            {$dataRows}
+        </Table>
+    </Worksheet>
+</Workbook>
+XML;
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.ms-excel',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    private function pdfResponse(array $rows, array $filters, array $scopeData, string $reportType, string $filename)
+    {
+        $pdf = Pdf::loadView('admin.progress.export-pdf', [
+            'rows' => $rows,
+            'filters' => $filters,
+            'scopeLabel' => $scopeData['scope_label'] ?? null,
+            'generatedAt' => now(),
+            'reportType' => $reportType,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download($filename);
+    }
+
+    private function excelCell(string $value, string $type): string
+    {
+        $escaped = htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+        return "<Cell><Data ss:Type=\"{$type}\">{$escaped}</Data></Cell>";
+    }
+
+    private function paceStatusOptions(): array
+    {
+        return [
+            'in_training' => 'In Training',
+            'awaiting_start' => 'Awaiting Start',
+            'catching_up' => 'Catching Up',
+            'on_track' => 'On Track',
+            'reading_ahead' => 'Reading Ahead',
+            'no_active_plan' => 'No Active Plan',
+        ];
+    }
+
+    private function trainingStatusOptions(): array
+    {
+        return [
+            'not_required' => 'Not Required',
+            'not_started' => 'Not Started',
+            'partial' => 'Partially Complete',
+            'completed' => 'Completed',
+        ];
+    }
+
+    private function reportTypeOptions(): array
+    {
+        return [
+            'detail' => 'Detailed rows',
+            'hierarchy_summary' => 'Hierarchy summary',
+        ];
+    }
+
+    private function filteredUsersForSummary(array $filters, array $scopeData): Collection
+    {
+        $query = $this->reportScope->accessibleUsersQuery(request()->user())
+            ->with([
+                'hierarchy.parent',
+                'hierarchy.leader',
+                'readingPlans.trainingResources',
+                'readingPlans.dailyReadings',
+                'readingProgress.dailyReading',
+                'trainingCompletions',
+            ]);
+
+        if ($scopeData['user_ids'] === []) {
+            return collect();
+        }
+
+        $query->whereIn('users.id', $scopeData['user_ids']);
+
+        if (is_array($scopeData['derived_user_ids'])) {
+            if ($scopeData['derived_user_ids'] === []) {
+                return collect();
+            }
+
+            $query->whereIn('users.id', $scopeData['derived_user_ids']);
+        }
+
+        if ($filters['user_id'] > 0) {
+            $query->where('users.id', $filters['user_id']);
+        }
+
+        if ($filters['hierarchy_id'] > 0) {
+            $query->where('users.hierarchy_id', $filters['hierarchy_id']);
+        }
+
+        if ($filters['role'] !== '') {
+            $query->where('users.role', $filters['role']);
+        }
+
+        if ($filters['plan_id'] > 0) {
+            $query->whereHas('readingPlans', fn (Builder $builder) => $builder->where('reading_plans.id', $filters['plan_id']));
+        }
+
+        return $query->orderBy('users.name')->get();
     }
 }

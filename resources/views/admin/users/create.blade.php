@@ -43,7 +43,7 @@
                     </label>
 
                     <label class="block">
-                        <span class="text-sm font-medium text-slate-700">Role</span>
+                        <span class="text-sm font-medium text-slate-700">Hierarchy role</span>
                         <select name="role" id="role" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                             <option value="">Select role</option>
                             @foreach($roleOptions as $value => $label)
@@ -51,6 +51,24 @@
                             @endforeach
                         </select>
                         @error('role')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block md:col-span-2">
+                        <span class="text-sm font-medium text-slate-700">System access roles</span>
+                        <select name="system_role_ids[]" multiple class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            @foreach($systemRoles as $systemRole)
+                                <option value="{{ $systemRole->id }}" {{ in_array($systemRole->id, old('system_role_ids', []), true) ? 'selected' : '' }}>
+                                    {{ $systemRole->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mt-2 text-xs text-slate-500">Optional. These roles grant platform-wide administration permissions without changing the person’s place in the hierarchy.</p>
+                        @error('system_role_ids')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                        @error('system_role_ids.*')
                             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror
                     </label>
@@ -156,6 +174,15 @@
                     <p>Admin-created users are verified immediately so they can sign in without waiting on email verification.</p>
                     <p>Assigning a plan here starts the user in that cohort with day one as their initial position.</p>
                     <p>If training resources exist on the plan, the user must complete training before daily reading opens.</p>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Access model</p>
+                <div class="mt-4 space-y-4 text-sm leading-6 text-slate-600">
+                    <p><span class="font-semibold text-slate-900">Hierarchy role</span> controls reporting lines and group visibility.</p>
+                    <p><span class="font-semibold text-slate-900">System access roles</span> control which admin tools this person can use.</p>
+                    <p>The two layers work together, but they are managed independently.</p>
                 </div>
             </section>
 

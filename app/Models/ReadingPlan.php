@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -13,6 +14,16 @@ use Illuminate\Support\Str;
 class ReadingPlan extends Model
 {
     use HasFactory;
+
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_RECRUITING = 'recruiting';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUS_ARCHIVED = 'archived';
 
     public const TYPE_NEW_TESTAMENT = 'new_testament';
 
@@ -40,12 +51,15 @@ class ReadingPlan extends Model
     protected $fillable = [
         'name',
         'type',
+        'lifecycle_status',
         'description',
         'chapters_per_day',
         'streak_days',
         'break_days',
         'start_date',
         'end_date',
+        'enrollment_starts_at',
+        'enrollment_ends_at',
         'is_active',
         'additional_info',
     ];
@@ -53,12 +67,60 @@ class ReadingPlan extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'enrollment_starts_at' => 'datetime',
+        'enrollment_ends_at' => 'datetime',
         'is_active' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $plan) {
+            if (! $plan->lifecycle_status) {
+                $plan->lifecycle_status = $plan->inferLegacyLifecycleStatus();
+            }
+
+            $plan->is_active = in_array($plan->lifecycle_status, self::liveStatuses(), true);
+        });
+    }
 
     public static function supportedTypes(): array
     {
         return array_keys(self::TYPE_DEFAULTS);
+    }
+
+    public static function lifecycleStatuses(): array
+    {
+        return [
+            self::STATUS_DRAFT,
+            self::STATUS_RECRUITING,
+            self::STATUS_ACTIVE,
+            self::STATUS_CLOSED,
+            self::STATUS_ARCHIVED,
+        ];
+    }
+
+    public static function lifecycleStatusOptions(): array
+    {
+        return [
+            self::STATUS_DRAFT => 'Draft',
+            self::STATUS_RECRUITING => 'Recruiting',
+            self::STATUS_ACTIVE => 'Active',
+            self::STATUS_CLOSED => 'Closed',
+            self::STATUS_ARCHIVED => 'Archived',
+        ];
+    }
+
+    public static function liveStatuses(): array
+    {
+        return [
+            self::STATUS_RECRUITING,
+            self::STATUS_ACTIVE,
+        ];
+    }
+
+    public static function publiclyVisibleStatuses(): array
+    {
+        return self::liveStatuses();
     }
 
     public static function typeConfigurations(): array
@@ -93,6 +155,32 @@ class ReadingPlan extends Model
         $breakBlocks = intdiv(max($readingDays - 1, 0), $streakDays);
 
         return $readingDays + ($breakBlocks * $breakDays);
+    }
+
+    public function scopeLive(Builder $query): Builder
+    {
+        return $query->whereIn('lifecycle_status', self::liveStatuses());
+    }
+
+    public function scopePubliclyVisible(Builder $query): Builder
+    {
+        return $query->whereIn('lifecycle_status', self::publiclyVisibleStatuses());
+    }
+
+    public function scopeAcceptingEnrollments(Builder $query, ?CarbonInterface $at = null): Builder
+    {
+        $at = $at ? Carbon::instance($at) : now();
+
+        return $query
+            ->publiclyVisible()
+            ->where(function (Builder $inner) use ($at) {
+                $inner->whereNull('enrollment_starts_at')
+                    ->orWhere('enrollment_starts_at', '<=', $at);
+            })
+            ->where(function (Builder $inner) use ($at) {
+                $inner->whereNull('enrollment_ends_at')
+                    ->orWhere('enrollment_ends_at', '>=', $at);
+            });
     }
 
     /**
@@ -202,6 +290,11 @@ class ReadingPlan extends Model
         return self::defaultsFor($this->type)['label'];
     }
 
+    public function getLifecycleStatusLabelAttribute(): string
+    {
+        return self::lifecycleStatusOptions()[$this->lifecycle_status] ?? Str::headline($this->lifecycle_status ?? 'draft');
+    }
+
     public function getCadenceDescriptionAttribute(): string
     {
         $breakDescription = $this->break_days > 0
@@ -240,6 +333,40 @@ class ReadingPlan extends Model
     public function isOldTestament(): bool
     {
         return $this->type === self::TYPE_OLD_TESTAMENT;
+    }
+
+    public function isLive(): bool
+    {
+        return in_array($this->lifecycle_status, self::liveStatuses(), true);
+    }
+
+    public function isRecruiting(): bool
+    {
+        return $this->lifecycle_status === self::STATUS_RECRUITING;
+    }
+
+    public function isPubliclyVisible(): bool
+    {
+        return in_array($this->lifecycle_status, self::publiclyVisibleStatuses(), true);
+    }
+
+    public function acceptsEnrollment(?CarbonInterface $at = null): bool
+    {
+        $at = $at ? Carbon::instance($at) : now();
+
+        if (! $this->isPubliclyVisible()) {
+            return false;
+        }
+
+        if ($this->enrollment_starts_at && $at->lt($this->enrollment_starts_at)) {
+            return false;
+        }
+
+        if ($this->enrollment_ends_at && $at->gt($this->enrollment_ends_at)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function isTrainingCompleteFor(User $user): bool
@@ -294,5 +421,22 @@ class ReadingPlan extends Model
         $this->forceFill([
             'end_date' => $this->start_date->copy()->addDays($totalJourneyDays - 1),
         ])->save();
+    }
+
+    private function inferLegacyLifecycleStatus(): string
+    {
+        if (! $this->is_active) {
+            return self::STATUS_DRAFT;
+        }
+
+        $startDate = $this->start_date
+            ? Carbon::parse($this->start_date)
+            : null;
+
+        if ($startDate && $startDate->isFuture()) {
+            return self::STATUS_RECRUITING;
+        }
+
+        return self::STATUS_ACTIVE;
     }
 }

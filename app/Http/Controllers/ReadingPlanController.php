@@ -21,22 +21,37 @@ class ReadingPlanController extends Controller
      */
     public function index()
     {
-        $readingPlans = ReadingPlan::all();
         $user = Auth::user();
+        $readingPlans = ReadingPlan::query()
+            ->publiclyVisible()
+            ->orderByRaw("case when lifecycle_status = '".ReadingPlan::STATUS_RECRUITING."' then 0 else 1 end")
+            ->orderBy('start_date')
+            ->get();
 
         $activePlan = $user->activeReadingPlan();
-        $joinedPlanIds = $user->readingPlans()->pluck('reading_plans.id')->all();
+        $joinedPlans = $user->readingPlans()->get()->keyBy('id');
 
         foreach ($readingPlans as $plan) {
             [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $plan);
-            $plan->setAttribute('user_has_joined', in_array($plan->id, $joinedPlanIds, true));
+            $joinedPlan = $joinedPlans->get($plan->id);
+
+            $plan->setAttribute('user_has_history', $joinedPlan !== null);
+            $plan->setAttribute('user_is_active_participant', (bool) $joinedPlan?->pivot?->is_active);
             $plan->setAttribute('user_can_join', $canJoin);
             $plan->setAttribute('locked_reason', $lockedReason);
         }
 
+        $visiblePlanIds = $readingPlans->pluck('id')->all();
+        $pastPlans = $user->readingPlans()
+            ->when($visiblePlanIds !== [], fn ($query) => $query->whereNotIn('reading_plans.id', $visiblePlanIds))
+            ->get()
+            ->sortByDesc(fn (ReadingPlan $plan) => $plan->pivot?->joined_date)
+            ->values();
+
         return view('reading-plans.index', [
             'readingPlans' => $readingPlans,
             'activePlan' => $activePlan,
+            'pastPlans' => $pastPlans,
         ]);
     }
 
@@ -49,6 +64,9 @@ class ReadingPlanController extends Controller
         $userPlan = $user->readingPlans()
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
+
+        abort_unless($readingPlan->isPubliclyVisible() || $userPlan, 404);
+
         [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
         $participationHistory = $user->readingPlanParticipations()
             ->where('reading_plan_id', $readingPlan->id)
@@ -70,6 +88,7 @@ class ReadingPlanController extends Controller
     public function join(ReadingPlan $readingPlan)
     {
         $user = Auth::user();
+        [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
 
         // Check if user is already in this plan
         $existingPlan = $user->readingPlans()
@@ -77,35 +96,11 @@ class ReadingPlanController extends Controller
             ->first();
 
         if ($existingPlan) {
-            // If already joined but not active, make it active
-            if (! $existingPlan->pivot->is_active) {
-                // First deactivate any currently active plans
-                $user->readingPlans()
-                    ->where('user_reading_plans.is_active', true)
-                    ->update(['user_reading_plans.is_active' => false]);
-
-                if (! $existingPlan->pivot->current_participation_id) {
-                    $participation = $this->participationService->startNewParticipation($user, $readingPlan);
-
-                    return redirect()->route('reading-plans.show', $readingPlan)
-                        ->with('success', 'You have resumed the '.$readingPlan->name.' reading plan.');
-                }
-
-                // Then activate this plan
-                $user->readingPlans()
-                    ->updateExistingPivot($readingPlan->id, [
-                        'is_active' => true,
-                    ]);
-
+            if ($existingPlan->pivot->is_active) {
                 return redirect()->route('reading-plans.show', $readingPlan)
-                    ->with('success', 'You have resumed the '.$readingPlan->name.' reading plan.');
+                    ->with('info', 'You are already participating in this reading plan.');
             }
-
-            return redirect()->route('reading-plans.show', $readingPlan)
-                ->with('info', 'You are already participating in this reading plan.');
         }
-
-        [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
 
         if (! $canJoin) {
             return redirect()->route('reading-plans.show', $readingPlan)
@@ -114,9 +109,10 @@ class ReadingPlanController extends Controller
 
         $this->participationService->startNewParticipation($user, $readingPlan);
 
-        // Redirect to the reading plan show page instead of directly to dashboard
         return redirect()->route('reading-plans.show', $readingPlan)
-            ->with('success', 'You have joined the '.$readingPlan->name.' reading plan. You can now start your reading journey!');
+            ->with('success', $existingPlan
+                ? 'A fresh participation cycle has been started for '.$readingPlan->name.'.'
+                : 'You have joined the '.$readingPlan->name.' reading plan. You can now start your reading journey!');
     }
 
     /**
@@ -273,6 +269,14 @@ class ReadingPlanController extends Controller
 
     private function getPlanAvailability(User $user, ReadingPlan $readingPlan): array
     {
+        if (! $readingPlan->isPubliclyVisible()) {
+            return [false, 'This reading plan is not currently visible to participants.'];
+        }
+
+        if (! $readingPlan->acceptsEnrollment()) {
+            return [false, 'Enrollment is currently closed for this reading plan.'];
+        }
+
         if ($readingPlan->isOldTestament() && ! $user->hasCompletedPlanType(ReadingPlan::TYPE_NEW_TESTAMENT)) {
             return [false, 'Old Testament plans unlock after you complete a New Testament plan.'];
         }

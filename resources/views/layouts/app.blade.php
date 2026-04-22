@@ -17,6 +17,7 @@
 </head>
 @php($user = auth()->user())
 @php($unreadInboxCount = $user?->unreadInboxCount() ?? 0)
+@php($unreadNotificationCount = $user?->unreadNotifications()->count() ?? 0)
 <body
     class="bg-stone-100 font-['Instrument_Sans'] text-slate-900 antialiased"
     x-data="{
@@ -105,6 +106,16 @@
                             <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Compose message</span>
                             <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Write</span>
                         </a>
+                        <a href="{{ route('notifications.index') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('notifications.*') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-bell w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms class="flex items-center gap-2">
+                                Alerts
+                                @if($unreadNotificationCount > 0)
+                                    <span class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadNotificationCount }}</span>
+                                @endif
+                            </span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Alerts</span>
+                        </a>
                         @if($user->canManageHierarchy())
                             <a href="{{ route('hierarchy.manage') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('hierarchy.manage') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
                                 <i class="fas fa-users w-5 text-center flex-shrink-0"></i>
@@ -117,7 +128,7 @@
                                 <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Branch</span>
                             </a>
                         @endif
-                        @if($user->isAdmin())
+                        @if($user->canAccessAdminPanel())
                             <a href="{{ route('admin.dashboard') }}" class="flex rounded-2xl text-sm font-medium transition text-slate-600 hover:bg-stone-100 hover:text-slate-900" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
                                 <i class="fas fa-shield-halved w-5 text-center flex-shrink-0"></i>
                                 <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Admin Console</span>
@@ -158,6 +169,12 @@
                         <a href="{{ route('profile.edit') }}" class="hidden rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-stone-300 hover:text-slate-900 sm:inline-flex">
                             Profile
                         </a>
+                        <a href="{{ route('notifications.index') }}" class="relative hidden rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-stone-300 hover:text-slate-900 sm:inline-flex">
+                            Alerts
+                            @if($unreadNotificationCount > 0)
+                                <span class="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadNotificationCount }}</span>
+                            @endif
+                        </a>
 
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-2 shadow-sm shadow-slate-900/5 transition hover:border-stone-300">
@@ -174,7 +191,11 @@
                                     <i class="fas fa-user-gear w-4 text-center text-slate-400"></i>
                                     Profile settings
                                 </a>
-                                @if($user->isAdmin())
+                                <a href="{{ route('notifications.index') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-stone-50 hover:text-slate-900">
+                                    <i class="fas fa-bell w-4 text-center text-slate-400"></i>
+                                    Alerts
+                                </a>
+                                @if($user->canAccessAdminPanel())
                                     <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-slate-600 transition hover:bg-stone-50 hover:text-slate-900">
                                         <i class="fas fa-shield-halved w-4 text-center text-slate-400"></i>
                                         Admin dashboard

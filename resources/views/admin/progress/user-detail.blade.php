@@ -16,6 +16,7 @@
                         <h2 class="mt-3 text-3xl font-semibold">{{ $user->name }}</h2>
                         <p class="mt-2 text-sm text-slate-200">{{ $user->email }}</p>
                         <p class="mt-1 text-sm text-slate-300">Member since {{ $user->created_at->format('M d, Y') }}</p>
+                        <p class="mt-3 text-sm text-emerald-100">{{ $scopeLabel }}</p>
                     </div>
                 </div>
                 <div class="flex items-end">

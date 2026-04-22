@@ -152,6 +152,12 @@
                             Build hierarchy structure
                             <i class="fas fa-arrow-right text-slate-400"></i>
                         </a>
+                        @if(auth()->user()->hasPermissionTo('automation.manage'))
+                            <a href="{{ route('admin.automation.index') }}" class="inline-flex items-center justify-between rounded-[1.35rem] bg-white px-5 py-4 text-sm font-semibold text-slate-800 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50">
+                                Manage automation
+                                <i class="fas fa-arrow-right text-slate-400"></i>
+                            </a>
+                        @endif
                     </div>
                 </div>
 

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Message;
 use App\Models\User;
 use App\Policies\MessagePolicy;
+use App\Support\SystemAccess;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +28,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Message::class, MessagePolicy::class);
+
+        foreach (SystemAccess::permissionSlugs() as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermissionTo($permission));
+        }
+
         Gate::define('send-downward-messages', fn (User $user) => $user->isAdmin() || $user->isLeader());
         Gate::define('send-upward-messages', fn (User $user) => ! $user->isAdmin());
-        Gate::define('manage-message-templates', fn (User $user) => $user->isAdmin());
+        Gate::define('manage-message-templates', fn (User $user) => $user->hasPermissionTo('messages.manage_templates'));
 
         // Log slow queries in development
         if (app()->environment('local')) {

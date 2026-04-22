@@ -50,6 +50,23 @@
                             </div>
                         </div>
                     </div>
+
+                    @if(auth()->user()->hasPermissionTo('progress.view'))
+                        <div class="mt-6 flex flex-wrap gap-3">
+                            <a href="{{ route('admin.progress.index') }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                                Open Scoped Reports
+                            </a>
+                            <a href="{{ route('admin.progress.index', ['pace_status' => 'catching_up']) }}" class="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100">
+                                Catching Up Report
+                            </a>
+                            <a href="{{ route('admin.progress.index', ['training_status' => 'partial']) }}" class="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100">
+                                Training Follow-up
+                            </a>
+                            <a href="{{ route('admin.progress.index', ['pace_status' => 'reading_ahead']) }}" class="inline-flex items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100">
+                                Reading Ahead Report
+                            </a>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">

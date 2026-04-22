@@ -3,7 +3,7 @@
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">{{ $readingPlan->type_label }}</span>
             <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $isUsable ? 'bg-emerald-100 text-emerald-700' : ($isRevoked ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') }}">
-                {{ $isUsable ? 'Enrollment open' : ($isRevoked ? 'Link revoked' : 'Link expired') }}
+                {{ $isUsable ? 'Enrollment open' : ($isRevoked ? 'Link revoked' : ($isExpired ? 'Link expired' : 'Enrollment closed')) }}
             </span>
         </div>
         <h1 class="mt-4 text-3xl font-semibold text-slate-900">{{ $readingPlan->name }}</h1>
@@ -30,7 +30,7 @@
 
         @if(!$isUsable)
             <div class="mt-6 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-                This enrollment link is no longer available. Please ask an admin for a fresh invitation.
+                This enrollment link is not currently available. It may be expired, revoked, or attached to a cohort that is no longer accepting enrollments.
             </div>
         @elseif($user)
             <div class="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">

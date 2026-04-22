@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -178,6 +179,18 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function reportPresets(): HasMany
+    {
+        return $this->hasMany(ReportPreset::class);
+    }
+
+    public function systemRoles(): BelongsToMany
+    {
+        return $this->belongsToMany(SystemRole::class, 'system_role_user')
+            ->with(['permissions'])
+            ->withTimestamps();
+    }
+
     public function currentParticipationForPlan(int|ReadingPlan $plan): ?ReadingPlanParticipation
     {
         $planId = $plan instanceof ReadingPlan ? $plan->id : $plan;
@@ -288,6 +301,84 @@ class User extends Authenticatable
     public function isAdmin()
     {
         return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function hasSystemRole(string $slug): bool
+    {
+        if ($this->relationLoaded('systemRoles')) {
+            return $this->systemRoles->contains(fn (SystemRole $role) => $role->slug === $slug);
+        }
+
+        return $this->systemRoles()
+            ->where('slug', $slug)
+            ->exists();
+    }
+
+    public function effectiveSystemRoles(): EloquentCollection
+    {
+        if ($this->relationLoaded('systemRoles')) {
+            return $this->systemRoles;
+        }
+
+        return $this->systemRoles()->get();
+    }
+
+    public function permissionNames(): array
+    {
+        if ($this->isAdmin() || $this->hasSystemRole(SystemRole::SUPER_ADMIN)) {
+            return \App\Support\SystemAccess::permissionSlugs();
+        }
+
+        return $this->effectiveSystemRoles()
+            ->flatMap(function (SystemRole $role) {
+                $permissions = $role->relationLoaded('permissions')
+                    ? $role->permissions
+                    : $role->permissions()->get();
+
+                return $permissions->pluck('name');
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function hasPermissionTo(string $permission): bool
+    {
+        if ($this->isAdmin() || $this->hasSystemRole(SystemRole::SUPER_ADMIN)) {
+            return true;
+        }
+
+        if ($this->relationLoaded('systemRoles')) {
+            return in_array($permission, $this->permissionNames(), true);
+        }
+
+        return $this->systemRoles()
+            ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
+            ->exists();
+    }
+
+    public function hasAnyPermission(array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->hasPermissionTo($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function canAccessAdminPanel(): bool
+    {
+        return $this->hasPermissionTo('admin.access');
+    }
+
+    public function systemRoleLabels(): array
+    {
+        return $this->effectiveSystemRoles()
+            ->pluck('name')
+            ->values()
+            ->all();
     }
 
     public function isLeader()

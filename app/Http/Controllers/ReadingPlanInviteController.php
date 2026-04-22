@@ -24,9 +24,9 @@ class ReadingPlanInviteController extends Controller
         $user = $request->user();
 
         return view('reading-plan-invites.show', [
-            'layoutComponent' => $user ? ($user->isAdmin() ? 'admin-layout' : 'app-layout') : 'guest-layout',
+            'layoutComponent' => $user ? ($user->canAccessAdminPanel() ? 'admin-layout' : 'app-layout') : 'guest-layout',
             'invite' => $invite,
-            'readingPlan' => $invite->readingPlan()->with('trainingResources')->first(),
+            'readingPlan' => $invite->readingPlan,
             'user' => $user,
             'isUsable' => $invite->isUsable(),
             'isExpired' => $invite->isExpired(),
@@ -100,7 +100,7 @@ class ReadingPlanInviteController extends Controller
     {
         return ReadingPlanInvite::query()
             ->where('token', $token)
-            ->with('readingPlan')
+            ->with('readingPlan.trainingResources')
             ->firstOrFail();
     }
 }

@@ -28,6 +28,11 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Teams</p>
                 <p class="mt-3 text-3xl font-semibold text-violet-700">{{ $stats['teams'] }}</p>
             </article>
+            <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5 sm:col-span-2 xl:col-span-1">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Vacant groups</p>
+                <p class="mt-3 text-3xl font-semibold text-amber-700">{{ $stats['vacant'] }}</p>
+                <p class="mt-2 text-sm text-slate-500">Hierarchy slots currently waiting for a leader.</p>
+            </article>
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -124,6 +129,48 @@
             </div>
         </section>
 
+        @if($teamBalanceInsights->isNotEmpty())
+            <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Balancing watch</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Sibling teams that may need a rebalance</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-500">These batch branches have a noticeable spread in member counts across teams. Use the bulk distribution tool if you want to level them out.</p>
+                    </div>
+                    <a href="{{ route('admin.users.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-white">
+                        Open user balancing tools
+                    </a>
+                </div>
+
+                <div class="mt-6 grid gap-4 xl:grid-cols-2">
+                    @foreach($teamBalanceInsights as $insight)
+                        <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-5">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-slate-900">{{ $insight['batch']->name }}</h3>
+                                    <p class="mt-1 text-sm text-slate-500">{{ $insight['batch']->displayPath() }}</p>
+                                </div>
+                                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                    Spread {{ $insight['spread'] }}
+                                </span>
+                            </div>
+
+                            <div class="mt-5 space-y-3">
+                                @foreach($insight['child_teams'] as $teamSummary)
+                                    <div class="flex items-center justify-between rounded-[1.1rem] bg-white px-4 py-3 text-sm">
+                                        <span class="font-medium text-slate-900">{{ $teamSummary['team']->name }}</span>
+                                        <span class="text-slate-500">{{ $teamSummary['member_count'] }} member(s)</span>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <p class="mt-4 text-sm text-slate-600">Suggested move target: about {{ $insight['suggested_moves'] }} member(s) from the heaviest team toward the lightest team.</p>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <section class="space-y-4">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Existing structure</p>
@@ -200,6 +247,50 @@
                                 </button>
                             </div>
                         </form>
+
+                        <div class="mt-6 grid gap-4 border-t border-slate-200 pt-5 lg:grid-cols-2">
+                            <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Promotion helper</p>
+                                <p class="mt-2 text-sm text-slate-600">Use this when the hierarchy is vacant and you want to promote someone straight into leadership.</p>
+                                <form method="POST" action="{{ route('admin.hierarchies.promote-leader', $hierarchy) }}" class="mt-4 space-y-3">
+                                    @csrf
+                                    <label class="block">
+                                        <span class="text-sm font-medium text-slate-700">Promote user</span>
+                                        <select name="promote_user_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            <option value="">Select user</option>
+                                            @foreach(($promotableUsers[$hierarchy->id] ?? collect()) as $candidate)
+                                                <option value="{{ $candidate->id }}">{{ $candidate->name }} · {{ $candidate->roleLabel() }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    <button type="submit" class="inline-flex rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800" {{ $hierarchy->leader_id ? 'disabled' : '' }}>
+                                        Promote into leadership
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Demotion helper</p>
+                                <p class="mt-2 text-sm text-slate-600">Release the current leader safely. Non-team leaders must land in a descendant team.</p>
+                                <form method="POST" action="{{ route('admin.hierarchies.demote-leader', $hierarchy) }}" class="mt-4 space-y-3">
+                                    @csrf
+                                    @if($hierarchy->type !== 'team')
+                                        <label class="block">
+                                            <span class="text-sm font-medium text-slate-700">Destination team</span>
+                                            <select name="demote_target_team_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                                <option value="">Select team</option>
+                                                @foreach(($descendantTeams[$hierarchy->id] ?? collect()) as $team)
+                                                    <option value="{{ $team->id }}">{{ $team->displayPath() }}</option>
+                                                @endforeach
+                                            </select>
+                                        </label>
+                                    @endif
+                                    <button type="submit" class="inline-flex rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100" {{ $hierarchy->leader_id ? '' : 'disabled' }}>
+                                        Demote current leader
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </article>
                 @empty
                     <div class="rounded-[2rem] border border-dashed border-slate-200 px-6 py-16 text-center text-sm text-slate-500 xl:col-span-2">
