@@ -16,6 +16,7 @@ class ReadingProgress extends Model
     protected $fillable = [
         'user_id',
         'reading_plan_id',
+        'reading_plan_participation_id',
         'daily_reading_id',
         'completed_date',
         'notes',
@@ -33,6 +34,11 @@ class ReadingProgress extends Model
     public function readingPlan(): BelongsTo
     {
         return $this->belongsTo(ReadingPlan::class);
+    }
+
+    public function participation(): BelongsTo
+    {
+        return $this->belongsTo(ReadingPlanParticipation::class, 'reading_plan_participation_id');
     }
 
     public function dailyReading(): BelongsTo

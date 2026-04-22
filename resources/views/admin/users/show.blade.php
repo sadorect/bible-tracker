@@ -129,6 +129,11 @@
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Last updated</p>
                             <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->updated_at->format('M d, Y') }}</p>
                         </div>
+                        <div class="rounded-[1.5rem] bg-slate-50 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Message delivery</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $user->messageDeliveryPreferenceLabel() ?? 'Admin default' }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ $user->message_delivery_preference_locked ? 'Locked by admin' : 'User can change this setting' }}</p>
+                        </div>
                     </div>
                 </section>
 

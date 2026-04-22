@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ReadingPlanInviteController;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -50,6 +51,11 @@ class PhoneLoginController extends Controller
             $request->session()->regenerate();
             // clear captcha
             session()->forget(['captcha_phone_a', 'captcha_phone_b', 'captcha_phone_sum']);
+
+            if ($pendingInviteRedirect = ReadingPlanInviteController::pendingInviteRedirectUrl($request)) {
+                return redirect()->to($pendingInviteRedirect);
+            }
+
             return redirect()->intended('dashboard');
         }
 

@@ -105,8 +105,9 @@ class AdminUserController extends Controller
         $readingPlans = ReadingPlan::all();
         $hierarchies = Hierarchy::with(['parent', 'leader'])->ordered()->get();
         $roleOptions = User::roleOptions();
+        $deliveryOptions = User::messageDeliveryOptions();
 
-        return view('admin.users.create', compact('readingPlans', 'hierarchies', 'roleOptions'));
+        return view('admin.users.create', compact('readingPlans', 'hierarchies', 'roleOptions', 'deliveryOptions'));
     }
 
     public function store(Request $request)
@@ -118,6 +119,8 @@ class AdminUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => ['required', 'in:'.implode(',', User::assignableRoles())],
             'hierarchy_id' => ['nullable', 'exists:hierarchies,id'],
+            'message_delivery_preference' => ['nullable', 'in:'.implode(',', array_keys(User::messageDeliveryOptions()))],
+            'message_delivery_preference_locked' => ['nullable', 'boolean'],
             'reading_plans' => ['array'],
             'reading_plans.*' => ['exists:reading_plans,id'],
         ]);
@@ -136,6 +139,8 @@ class AdminUserController extends Controller
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'hierarchy_id' => $selectedHierarchy?->id,
+                'message_delivery_preference' => $request->input('message_delivery_preference') ?: null,
+                'message_delivery_preference_locked' => $request->boolean('message_delivery_preference_locked'),
                 'email_verified_at' => now(), // Auto-verify admin created users
             ]);
 
@@ -162,8 +167,9 @@ class AdminUserController extends Controller
         $userPlanIds = $user->readingPlans->pluck('id')->toArray();
         $hierarchies = Hierarchy::with(['parent', 'leader'])->ordered()->get();
         $roleOptions = User::roleOptions();
+        $deliveryOptions = User::messageDeliveryOptions();
 
-        return view('admin.users.edit', compact('user', 'readingPlans', 'userPlanIds', 'hierarchies', 'roleOptions'));
+        return view('admin.users.edit', compact('user', 'readingPlans', 'userPlanIds', 'hierarchies', 'roleOptions', 'deliveryOptions'));
     }
 
     public function update(Request $request, User $user)
@@ -174,6 +180,8 @@ class AdminUserController extends Controller
             'phone_number' => ['nullable', 'string', 'max:255', 'unique:users,phone_number,'.$user->id],
             'role' => ['required', 'in:'.implode(',', User::assignableRoles())],
             'hierarchy_id' => ['nullable', 'exists:hierarchies,id'],
+            'message_delivery_preference' => ['nullable', 'in:'.implode(',', array_keys(User::messageDeliveryOptions()))],
+            'message_delivery_preference_locked' => ['nullable', 'boolean'],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
             'reading_plans' => ['array'],
             'reading_plans.*' => ['exists:reading_plans,id'],
@@ -193,6 +201,8 @@ class AdminUserController extends Controller
                 'phone_number' => $request->filled('phone_number') ? $request->phone_number : null,
                 'role' => $request->role,
                 'hierarchy_id' => $selectedHierarchy?->id,
+                'message_delivery_preference' => $request->input('message_delivery_preference') ?: null,
+                'message_delivery_preference_locked' => $request->boolean('message_delivery_preference_locked'),
             ];
 
             if ($request->filled('password')) {

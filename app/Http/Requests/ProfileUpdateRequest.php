@@ -25,6 +25,10 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'message_delivery_preference' => [
+                'nullable',
+                Rule::in(array_keys(User::messageDeliveryOptions())),
+            ],
         ];
     }
 }

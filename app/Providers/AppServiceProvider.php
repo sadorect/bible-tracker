@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Message;
+use App\Models\User;
+use App\Policies\MessagePolicy;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Events\QueryExecuted;
@@ -22,6 +26,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(Message::class, MessagePolicy::class);
+        Gate::define('send-downward-messages', fn (User $user) => $user->isAdmin() || $user->isLeader());
+        Gate::define('send-upward-messages', fn (User $user) => ! $user->isAdmin());
+        Gate::define('manage-message-templates', fn (User $user) => $user->isAdmin());
+
         // Log slow queries in development
         if (app()->environment('local')) {
             DB::listen(function (QueryExecuted $query) {

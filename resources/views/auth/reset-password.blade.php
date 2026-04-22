@@ -69,7 +69,11 @@
 document.getElementById('refreshCaptchaPwReset')?.addEventListener('click', async () => {
     try {
         const res = await fetch('{{ route('captcha.refresh') }}?for=password-reset', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+            },
             credentials: 'same-origin',
             cache: 'no-store'
         });

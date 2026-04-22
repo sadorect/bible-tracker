@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ReadingPlan;
+use App\Models\ReadingPlanInvite;
 use App\Models\TrainingResource;
 use Artisan;
 use Carbon\Carbon;
@@ -66,7 +67,7 @@ class AdminReadingPlanController extends Controller
      */
     public function edit(ReadingPlan $readingPlan)
     {
-        $readingPlan->load(['trainingResources', 'users']);
+        $readingPlan->load(['trainingResources', 'users', 'invites.creator']);
 
         return view('admin.reading-plans.edit', [
             'readingPlan' => $readingPlan,
@@ -272,6 +273,35 @@ class AdminReadingPlanController extends Controller
 
         return redirect()->route('admin.reading-plans.edit', $readingPlan)
             ->with('success', 'Training resource removed successfully.');
+    }
+
+    public function storeInvite(Request $request, ReadingPlan $readingPlan)
+    {
+        $validated = $request->validate([
+            'label' => ['nullable', 'string', 'max:255'],
+            'expires_at' => ['required', 'date', 'after:now'],
+        ]);
+
+        $readingPlan->invites()->create([
+            'created_by' => $request->user()->id,
+            'label' => $validated['label'] ?? null,
+            'expires_at' => Carbon::parse($validated['expires_at']),
+        ]);
+
+        return redirect()->route('admin.reading-plans.edit', $readingPlan)
+            ->with('success', 'Enrollment link generated successfully.');
+    }
+
+    public function revokeInvite(ReadingPlan $readingPlan, ReadingPlanInvite $readingPlanInvite)
+    {
+        abort_unless($readingPlanInvite->reading_plan_id === $readingPlan->id, 404);
+
+        $readingPlanInvite->update([
+            'revoked_at' => now(),
+        ]);
+
+        return redirect()->route('admin.reading-plans.edit', $readingPlan)
+            ->with('success', 'Enrollment link revoked successfully.');
     }
 
     private function validateReadingPlan(Request $request): array

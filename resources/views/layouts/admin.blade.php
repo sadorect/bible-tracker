@@ -16,6 +16,7 @@
     <style>[x-cloak]{display:none !important;}</style>
 </head>
 @php($user = auth()->user())
+@php($unreadInboxCount = $user?->unreadInboxCount() ?? 0)
 <body
     class="bg-slate-100 font-['Instrument_Sans'] text-slate-900 antialiased"
     x-data="{
@@ -96,6 +97,26 @@
                             <i class="fas fa-chart-line w-5 text-center flex-shrink-0"></i>
                             <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Progress Reports</span>
                             <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Reports</span>
+                        </a>
+                        <a href="{{ route('messages.inbox') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('messages.inbox') || request()->routeIs('messages.index') || request()->routeIs('messages.sent') || request()->routeIs('messages.show') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 px-4 py-3'">
+                            <i class="fas fa-inbox w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms class="flex items-center gap-2">
+                                Message Centre
+                                @if($unreadInboxCount > 0)
+                                    <span class="rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unreadInboxCount }}</span>
+                                @endif
+                            </span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Inbox</span>
+                        </a>
+                        <a href="{{ route('messages.compose') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('messages.compose') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
+                            <i class="fas fa-pen-to-square w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Compose message</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Write</span>
+                        </a>
+                        <a href="{{ route('admin.messages.settings') }}" class="flex rounded-2xl text-sm font-medium transition {{ request()->routeIs('admin.messages.settings*') || request()->routeIs('admin.messages.templates.*') ? 'bg-white text-slate-950 shadow-lg shadow-black/10' : 'text-slate-300 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'flex-col items-center justify-center gap-0.5 px-2 py-2.5' : 'flex-row items-center gap-3 pl-8 py-3'">
+                            <i class="fas fa-gear w-5 text-center flex-shrink-0"></i>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity.duration.200ms>Messaging settings</span>
+                            <span x-show="sidebarCollapsed" class="text-[9px] font-semibold leading-none tracking-wide">Setup</span>
                         </a>
                     </nav>
                 </div>

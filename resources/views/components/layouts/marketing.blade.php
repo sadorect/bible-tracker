@@ -34,7 +34,6 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 <a href="/" class="flex items-center gap-3">
                     <x-application-logo class="w-9 h-9 text-emerald-600" />
-                    <span class="font-bold text-lg">{{ config('app.name', 'Bible Tracker') }}</span>
                 </a>
                 <nav class="hidden md:flex items-center gap-8 text-sm">
                     <a href="#features" class="hover:text-emerald-600">Features</a>
@@ -60,7 +59,6 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <x-application-logo class="w-7 h-7 text-emerald-600" />
-                        <span class="font-semibold">{{ config('app.name', 'Bible Tracker') }}</span>
                     </div>
                     <p class="mt-3 text-gray-600 dark:text-gray-400">Track scripture daily, follow meaningful plans, and grow with your community.</p>
                 </div>

@@ -191,6 +191,7 @@ class Dashboard extends Component
 
         $this->completedToday = ReadingProgress::where('user_id', $user->id)
             ->where('daily_reading_id', $this->todayReading?->id)
+            ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
             ->exists();
 
         $this->viewingDay = $this->userPlan->pivot->current_day;
@@ -226,6 +227,7 @@ class Dashboard extends Component
         foreach ($previousReadings as $reading) {
             $progressRecord = ReadingProgress::where('user_id', $user->id)
                 ->where('daily_reading_id', $reading->id)
+                ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
                 ->first();
 
             $actualReadingDate = $readingStartDate
@@ -274,6 +276,7 @@ class Dashboard extends Component
         $currentDate = $calendarStart->copy();
         $completedReadings = ReadingProgress::where('user_id', $user->id)
             ->where('reading_progress.reading_plan_id', $this->readingPlan->id)
+            ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_progress.reading_plan_participation_id', $participationId))
             ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
             ->pluck('daily_readings.day_number')
             ->toArray();
@@ -432,6 +435,7 @@ class Dashboard extends Component
                 $user = Auth::user();
                 $completed = ReadingProgress::where('user_id', $user->id)
                     ->where('daily_reading_id', $reading->id)
+                    ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
                     ->exists();
 
                 return [
@@ -471,6 +475,7 @@ class Dashboard extends Component
         $user = Auth::user();
         $this->viewingCompleted = ReadingProgress::where('user_id', $user->id)
             ->where('daily_reading_id', $this->viewingReading?->id)
+            ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
             ->exists();
 
         if (
@@ -528,6 +533,7 @@ class Dashboard extends Component
             ->filter(function ($reading) use ($user) {
                 return ! ReadingProgress::where('user_id', $user->id)
                     ->where('daily_reading_id', $reading->id)
+                    ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
                     ->exists();
             });
 
@@ -578,6 +584,7 @@ class Dashboard extends Component
 
         $alreadyCompleted = ReadingProgress::where('user_id', $user->id)
             ->where('daily_reading_id', $reading->id)
+            ->when($this->currentParticipationId($user, $this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
             ->exists();
 
         if ($alreadyCompleted) {
@@ -589,6 +596,7 @@ class Dashboard extends Component
         ReadingProgress::create([
             'user_id' => $user->id,
             'reading_plan_id' => $this->readingPlan->id,
+            'reading_plan_participation_id' => $this->currentParticipationId($user, $this->readingPlan->id),
             'daily_reading_id' => $reading->id,
             'completed_date' => Carbon::today(),
         ]);
@@ -611,6 +619,7 @@ class Dashboard extends Component
         $currentDay = $userPlan->pivot->current_day;
         $completedDayNumbers = ReadingProgress::where('user_id', $user->id)
             ->where('reading_progress.reading_plan_id', $planId)
+            ->when($this->currentParticipationId($user, $planId), fn ($query, $participationId) => $query->where('reading_progress.reading_plan_participation_id', $participationId))
             ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
             ->pluck('daily_readings.day_number')
             ->toArray();
@@ -652,6 +661,11 @@ class Dashboard extends Component
         $this->showCatchUpModal = false;
         $this->selectedReading = null;
         $this->selectedDay = null;
+    }
+
+    protected function currentParticipationId($user, $planId): ?int
+    {
+        return $user?->currentParticipationIdForPlan($planId);
     }
 
     public function render()

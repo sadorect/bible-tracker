@@ -4,12 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\ReadingPlan;
 use App\Models\User;
+use App\Services\ReadingPlanParticipationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReadingPlanController extends Controller
 {
+    public function __construct(
+        private readonly ReadingPlanParticipationService $participationService,
+    ) {
+    }
+
     /**
      * Display a listing of the reading plans.
      */
@@ -44,12 +50,17 @@ class ReadingPlanController extends Controller
             ->where('reading_plan_id', $readingPlan->id)
             ->first();
         [$canJoin, $lockedReason] = $this->getPlanAvailability($user, $readingPlan);
+        $participationHistory = $user->readingPlanParticipations()
+            ->where('reading_plan_id', $readingPlan->id)
+            ->latest('started_on')
+            ->get();
 
         return view('reading-plans.show', [
             'readingPlan' => $readingPlan,
             'userPlan' => $userPlan,
             'canJoin' => $canJoin,
             'lockedReason' => $lockedReason,
+            'participationHistory' => $participationHistory,
         ]);
     }
 
@@ -73,6 +84,13 @@ class ReadingPlanController extends Controller
                     ->where('user_reading_plans.is_active', true)
                     ->update(['user_reading_plans.is_active' => false]);
 
+                if (! $existingPlan->pivot->current_participation_id) {
+                    $participation = $this->participationService->startNewParticipation($user, $readingPlan);
+
+                    return redirect()->route('reading-plans.show', $readingPlan)
+                        ->with('success', 'You have resumed the '.$readingPlan->name.' reading plan.');
+                }
+
                 // Then activate this plan
                 $user->readingPlans()
                     ->updateExistingPivot($readingPlan->id, [
@@ -94,19 +112,7 @@ class ReadingPlanController extends Controller
                 ->with('error', $lockedReason);
         }
 
-        // Deactivate any currently active plans
-        $user->readingPlans()
-            ->where('user_reading_plans.is_active', true)
-            ->update(['user_reading_plans.is_active' => false]);
-
-        // Join the new plan
-        $user->readingPlans()->attach($readingPlan->id, [
-            'joined_date' => Carbon::today(),
-            'current_day' => 1,
-            'current_streak' => 0,
-            'completion_rate' => 0,
-            'is_active' => true,
-        ]);
+        $this->participationService->startNewParticipation($user, $readingPlan);
 
         // Redirect to the reading plan show page instead of directly to dashboard
         return redirect()->route('reading-plans.show', $readingPlan)
@@ -131,8 +137,11 @@ class ReadingPlanController extends Controller
         }
 
         // Delete all reading progress for this user and plan
+        $currentParticipationId = $user->currentParticipationIdForPlan($readingPlan);
+
         $user->readingProgress()
             ->where('reading_plan_id', $readingPlan->id)
+            ->when($currentParticipationId, fn ($query) => $query->where('reading_plan_participation_id', $currentParticipationId))
             ->delete();
 
         // Reset the pivot data
@@ -183,6 +192,7 @@ class ReadingPlanController extends Controller
         // Recalculate completion rate
         $completedDays = $user->readingProgress()
             ->where('reading_plan_id', $readingPlan->id)
+            ->when($user->currentParticipationIdForPlan($readingPlan), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
             ->count();
 
         $completionRate = ($completedDays / $day) * 100;
@@ -219,6 +229,7 @@ class ReadingPlanController extends Controller
         foreach ($dailyReadings as $reading) {
             $completed = $user->readingProgress()
                 ->where('daily_reading_id', $reading->id)
+                ->when($user->currentParticipationIdForPlan($readingPlan), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
                 ->first();
 
             $progress[] = [
@@ -254,6 +265,7 @@ class ReadingPlanController extends Controller
         $user->readingPlans()->updateExistingPivot($readingPlan->id, [
             'is_active' => false,
         ]);
+        $this->participationService->markParticipationLeft($user, $readingPlan);
 
         return redirect()->route('reading-plans.index')
             ->with('success', 'You have left the '.$readingPlan->name.' reading plan.');

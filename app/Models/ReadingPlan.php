@@ -109,8 +109,18 @@ class ReadingPlan extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_reading_plans')
-            ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
+            ->withPivot(['joined_date', 'current_participation_id', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
             ->withTimestamps();
+    }
+
+    public function invites(): HasMany
+    {
+        return $this->hasMany(ReadingPlanInvite::class)->latest();
+    }
+
+    public function participations(): HasMany
+    {
+        return $this->hasMany(ReadingPlanParticipation::class);
     }
 
     /**

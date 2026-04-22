@@ -163,6 +163,30 @@
                         </div>
                     </div>
                 </div>
+
+                @if($participationHistory->isNotEmpty())
+                    <div class="mt-8 rounded-[1.5rem] bg-stone-50 p-5">
+                        <h4 class="text-lg font-semibold text-slate-900">Your participation history</h4>
+                        <div class="mt-4 grid gap-3">
+                            @foreach($participationHistory as $participation)
+                                <div class="rounded-[1.25rem] border border-stone-200 bg-white px-4 py-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-900">Cycle {{ $participation->participation_number }}</p>
+                                            <p class="mt-1 text-sm text-slate-500">
+                                                Started {{ $participation->started_on?->format('M d, Y') }}
+                                                @if($participation->ended_on)
+                                                    • Ended {{ $participation->ended_on->format('M d, Y') }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ ucfirst($participation->status) }}</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </article>
 
             <aside class="space-y-6">

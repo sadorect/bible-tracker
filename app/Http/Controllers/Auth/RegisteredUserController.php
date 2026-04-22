@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ReadingPlanInviteController;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -79,6 +80,10 @@ class RegisteredUserController extends Controller
 
         // Invalidate captcha after successful registration
         session()->forget(['captcha_register_a', 'captcha_register_b', 'captcha_register_sum']);
+
+        if ($pendingInviteRedirect = ReadingPlanInviteController::pendingInviteRedirectUrl($request)) {
+            return redirect()->to($pendingInviteRedirect);
+        }
 
         return redirect(route('dashboard', absolute: false));
     }

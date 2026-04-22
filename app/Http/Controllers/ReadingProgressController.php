@@ -135,6 +135,7 @@ class ReadingProgressController extends Controller
         }
 
         $currentDay = $userPlan->pivot->current_day;
+        $currentParticipationId = $user->currentParticipationIdForPlan($userPlan->id);
         $maxDay = (int) DailyReading::where('reading_plan_id', $userPlan->id)->max('day_number');
 
         // Build list of days to mark
@@ -190,6 +191,7 @@ class ReadingProgressController extends Controller
 
             $exists = ReadingProgress::where('user_id', $user->id)
                 ->where('daily_reading_id', $reading->id)
+                ->when($currentParticipationId, fn ($query) => $query->where('reading_plan_participation_id', $currentParticipationId))
                 ->exists();
             if ($exists) {
                 $already++;
@@ -200,6 +202,7 @@ class ReadingProgressController extends Controller
             ReadingProgress::create([
                 'user_id' => $user->id,
                 'reading_plan_id' => $userPlan->id,
+                'reading_plan_participation_id' => $currentParticipationId,
                 'daily_reading_id' => $reading->id,
                 'completed_date' => Carbon::today(),
             ]);
@@ -213,12 +216,14 @@ class ReadingProgressController extends Controller
             ->count();
         $completedDays = ReadingProgress::where('user_id', $user->id)
             ->where('reading_plan_id', $userPlan->id)
+            ->when($currentParticipationId, fn ($query) => $query->where('reading_plan_participation_id', $currentParticipationId))
             ->count();
         $completionRate = $readingDaysSoFar > 0 ? ($completedDays / $readingDaysSoFar) * 100 : 0;
 
         // Plan-based streak: consecutive completed reading days from current_day (skip breaks)
         $completedDayNumbers = ReadingProgress::where('user_id', $user->id)
             ->where('reading_progress.reading_plan_id', $userPlan->id)
+            ->when($currentParticipationId, fn ($query) => $query->where('reading_progress.reading_plan_participation_id', $currentParticipationId))
             ->join('daily_readings', 'daily_readings.id', '=', 'reading_progress.daily_reading_id')
             ->pluck('daily_readings.day_number')
             ->toArray();

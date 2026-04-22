@@ -146,6 +146,92 @@
             </aside>
         </section>
 
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Guest enrollment</p>
+                    <h2 class="mt-2 text-2xl font-semibold text-slate-900">Generate an enrollment link</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">Links can be shared publicly, do not have a usage cap, and can be revoked at any time. Returning participants can use them to start fresh cycles on the same profile.</p>
+                </div>
+
+                <form method="POST" action="{{ route('admin.reading-plans.invites.store', $readingPlan) }}" class="mt-6 grid gap-5 md:grid-cols-2">
+                    @csrf
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Label</span>
+                        <input type="text" name="label" value="{{ old('label') }}" placeholder="April outreach link" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('label')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Expiry date and time</span>
+                        <input type="datetime-local" name="expires_at" value="{{ old('expires_at') }}" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                        @error('expires_at')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </label>
+
+                    <div class="md:col-span-2 flex justify-end">
+                        <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            Generate enrollment link
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Live links</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">Enrollment links</h2>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ $readingPlan->invites->count() }} total</span>
+                </div>
+
+                <div class="mt-6 space-y-4">
+                    @forelse($readingPlan->invites as $invite)
+                        <article class="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                            <div class="flex flex-col gap-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $invite->isUsable() ? 'bg-emerald-100 text-emerald-700' : ($invite->isRevoked() ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') }}">
+                                        {{ $invite->isUsable() ? 'Active' : ($invite->isRevoked() ? 'Revoked' : 'Expired') }}
+                                    </span>
+                                    @if($invite->label)
+                                        <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{{ $invite->label }}</span>
+                                    @endif
+                                </div>
+
+                                <div class="space-y-2">
+                                    <p class="text-sm text-slate-500">Created by {{ $invite->creator?->name ?? 'Unknown' }} on {{ $invite->created_at->format('M d, Y g:i A') }}</p>
+                                    <p class="text-sm text-slate-500">Expires {{ $invite->expires_at?->format('M d, Y g:i A') ?? 'Never' }}</p>
+                                    <input type="text" readonly value="{{ $invite->enrollmentUrl() }}" class="w-full rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm shadow-slate-900/5">
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <p class="text-sm text-slate-600">{{ $invite->participations()->count() }} participation cycle(s) started from this link.</p>
+                                    @if(!$invite->isRevoked())
+                                        <form method="POST" action="{{ route('admin.reading-plans.invites.revoke', [$readingPlan, $invite]) }}" onsubmit="return confirm('Revoke this enrollment link?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex rounded-2xl bg-rose-100 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-200">
+                                                Revoke link
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        </article>
+                    @empty
+                        <div class="rounded-[1.5rem] border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
+                            No enrollment links generated yet.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+        </section>
+
         <section class="grid gap-6 xl:grid-cols-2">
             <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
                 <div>

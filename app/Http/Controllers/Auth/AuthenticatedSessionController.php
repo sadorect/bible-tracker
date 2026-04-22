@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ReadingPlanInviteController;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,6 +59,10 @@ class AuthenticatedSessionController extends Controller
 
         // Invalidate captcha after successful login attempt
         session()->forget(['captcha_login_a', 'captcha_login_b', 'captcha_login_sum']);
+
+        if ($pendingInviteRedirect = ReadingPlanInviteController::pendingInviteRedirectUrl($request)) {
+            return redirect()->to($pendingInviteRedirect);
+        }
 
         if (auth()->user()->isAdmin()) {
             return redirect()->intended(route('admin.dashboard', absolute: false));

@@ -80,6 +80,7 @@ class ReadingHistory extends Component
         // Get all completed readings for this user and plan
         $completedReadings = ReadingProgress::where('user_id', $user->id)
             ->where('reading_plan_id', $this->userPlan->id)
+            ->when($user->currentParticipationIdForPlan($this->userPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
             ->get()
             ->keyBy('daily_reading_id');
 

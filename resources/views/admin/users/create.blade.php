@@ -72,6 +72,25 @@
                     </label>
 
                     <label class="block">
+                        <span class="text-sm font-medium text-slate-700">Message delivery override</span>
+                        <select name="message_delivery_preference" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                            <option value="">Use admin default</option>
+                            @foreach($deliveryOptions as $value => $label)
+                                <option value="{{ $value }}" {{ old('message_delivery_preference') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="flex items-start gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 md:col-span-2">
+                        <input type="hidden" name="message_delivery_preference_locked" value="0">
+                        <input type="checkbox" name="message_delivery_preference_locked" value="1" {{ old('message_delivery_preference_locked') ? 'checked' : '' }} class="mt-1 rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Lock delivery preference</p>
+                            <p class="mt-1 text-sm text-slate-500">When locked, this user cannot change their own inbox/email preference.</p>
+                        </div>
+                    </label>
+
+                    <label class="block">
                         <span class="text-sm font-medium text-slate-700">Password</span>
                         <input type="password" name="password" id="password" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                         @error('password')

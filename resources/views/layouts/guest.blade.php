@@ -27,7 +27,6 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 <a href="/" class="flex items-center gap-3">
                     <x-application-logo class="w-8 h-8 text-indigo-600" />
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ config('app.name', 'Bible Tracker') }}</span>
                 </a>
                 <div class="flex items-center gap-6 text-sm">
                     <a href="{{ url('/#features') }}" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">Features</a>

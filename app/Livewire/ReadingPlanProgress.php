@@ -57,6 +57,7 @@ class ReadingPlanProgress extends Component
         foreach ($dailyReadings as $reading) {
             $completed = ReadingProgress::where('user_id', $user->id)
                 ->where('daily_reading_id', $reading->id)
+                ->when($user->currentParticipationIdForPlan($this->readingPlan->id), fn ($query, $participationId) => $query->where('reading_plan_participation_id', $participationId))
                 ->first();
 
             $this->readingProgress[] = [

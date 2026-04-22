@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminHierarchyController;
+use App\Http\Controllers\Admin\AdminMessagingSettingsController;
 use App\Http\Controllers\Admin\AdminReadingPlanController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\UserProgressController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\MessageCenterController;
 use App\Http\Controllers\LeaderHierarchyController;
+use App\Http\Controllers\ReadingPlanInviteController;
 use App\Http\Controllers\ReadingPlanController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Middleware\Admin;
@@ -18,6 +21,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/enroll/{token}', [ReadingPlanInviteController::class, 'show'])->name('reading-plan-invites.show');
+Route::get('/enroll/{token}/login', [ReadingPlanInviteController::class, 'beginLogin'])->name('reading-plan-invites.login');
+Route::get('/enroll/{token}/register-fresh', [ReadingPlanInviteController::class, 'beginRegisterFresh'])->name('reading-plan-invites.register-fresh');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
@@ -46,6 +53,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/reading-plans/{readingPlan}/skip', [ReadingPlanController::class, 'skipToDay'])->name('reading-plans.skip');
     Route::get('/reading-plans/{readingPlan}/progress', [ReadingPlanController::class, 'viewProgress'])->name('reading-plans.progress');
     Route::get('/reading-history', ReadingHistory::class)->name('reading-history');
+    Route::get('/messages', [MessageCenterController::class, 'inbox'])->name('messages.index');
+    Route::get('/messages/inbox', [MessageCenterController::class, 'inbox'])->name('messages.inbox');
+    Route::get('/messages/sent', [MessageCenterController::class, 'sent'])->name('messages.sent');
+    Route::get('/messages/compose', [MessageCenterController::class, 'compose'])->name('messages.compose');
+    Route::post('/messages/compose/preview', [MessageCenterController::class, 'preview'])->name('messages.preview');
+    Route::post('/messages', [MessageCenterController::class, 'store'])->name('messages.store');
+    Route::get('/messages/{message}', [MessageCenterController::class, 'show'])->name('messages.show');
+    Route::post('/enroll/{token}/accept', [ReadingPlanInviteController::class, 'accept'])->name('reading-plan-invites.accept');
 
     // Leader hierarchy tree — scoped to the leader's own branch
     Route::get('/my-hierarchy', [LeaderHierarchyController::class, 'tree'])->name('leader.hierarchies.tree');
@@ -78,11 +93,18 @@ Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->grou
         ->name('reading-plans.training-resources.store');
     Route::delete('reading-plans/{readingPlan}/training-resources/{trainingResource}', [AdminReadingPlanController::class, 'destroyTrainingResource'])
         ->name('reading-plans.training-resources.destroy');
+    Route::post('reading-plans/{readingPlan}/invites', [AdminReadingPlanController::class, 'storeInvite'])
+        ->name('reading-plans.invites.store');
+    Route::delete('reading-plans/{readingPlan}/invites/{readingPlanInvite}', [AdminReadingPlanController::class, 'revokeInvite'])
+        ->name('reading-plans.invites.revoke');
 
-    // Additional admin routes can be added here
-    Route::get('settings', function () {
-        return view('admin.settings');
-    })->name('settings');
+    Route::get('messages/settings', [AdminMessagingSettingsController::class, 'index'])->name('messages.settings');
+    Route::put('messages/settings', [AdminMessagingSettingsController::class, 'update'])->name('messages.settings.update');
+    Route::post('messages/templates', [AdminMessagingSettingsController::class, 'storeTemplate'])->name('messages.templates.store');
+    Route::put('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'updateTemplate'])->name('messages.templates.update');
+    Route::delete('messages/templates/{messageTemplate}', [AdminMessagingSettingsController::class, 'destroyTemplate'])->name('messages.templates.destroy');
+
+    Route::redirect('settings', 'messages/settings')->name('settings');
 });
 
 require __DIR__.'/auth.php';

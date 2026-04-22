@@ -26,6 +26,12 @@ class User extends Authenticatable
 
     public const ROLE_TEAM_LEADER = 'team_leader';
 
+    public const MESSAGE_DELIVERY_INBOX = 'inbox';
+
+    public const MESSAGE_DELIVERY_EMAIL = 'email';
+
+    public const MESSAGE_DELIVERY_BOTH = 'both';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -33,6 +39,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name', 'email', 'phone_number', 'password', 'role', 'hierarchy_id',
+        'message_delivery_preference', 'message_delivery_preference_locked',
     ];
 
     public static function roleOptions(): array
@@ -45,6 +52,15 @@ class User extends Authenticatable
             self::ROLE_SQUAD_LEADER => 'Squad Leader',
             self::ROLE_ADMIN => 'Admin',
             self::ROLE_CLAN_LEADER => 'Clan Leader',
+        ];
+    }
+
+    public static function messageDeliveryOptions(): array
+    {
+        return [
+            self::MESSAGE_DELIVERY_BOTH => 'Inbox + Email',
+            self::MESSAGE_DELIVERY_INBOX => 'Inbox Only',
+            self::MESSAGE_DELIVERY_EMAIL => 'Email Only',
         ];
     }
 
@@ -101,6 +117,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'message_delivery_preference_locked' => 'boolean',
         ];
     }
 
@@ -139,11 +156,69 @@ class User extends Authenticatable
         return $this->hasMany(TrainingCompletion::class);
     }
 
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function readingPlanParticipations(): HasMany
+    {
+        return $this->hasMany(ReadingPlanParticipation::class);
+    }
+
+    public function receivedMessageRecipients(): HasMany
+    {
+        return $this->hasMany(MessageRecipient::class, 'recipient_id');
+    }
+
     public function readingPlans(): BelongsToMany
     {
         return $this->belongsToMany(ReadingPlan::class, 'user_reading_plans')
-            ->withPivot(['joined_date', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
+            ->withPivot(['joined_date', 'current_participation_id', 'current_day', 'current_streak', 'completion_rate', 'is_active'])
             ->withTimestamps();
+    }
+
+    public function currentParticipationForPlan(int|ReadingPlan $plan): ?ReadingPlanParticipation
+    {
+        $planId = $plan instanceof ReadingPlan ? $plan->id : $plan;
+
+        $participationId = $this->currentParticipationIdForPlan($planId);
+
+        if (! $participationId) {
+            return null;
+        }
+
+        return ReadingPlanParticipation::query()->find($participationId);
+    }
+
+    public function currentParticipationIdForPlan(int|ReadingPlan $plan): ?int
+    {
+        $planId = $plan instanceof ReadingPlan ? $plan->id : $plan;
+
+        if ($this->relationLoaded('readingPlans')) {
+            $loadedPlan = $this->readingPlans->first(fn (ReadingPlan $readingPlan) => $readingPlan->id === $planId);
+
+            if ($loadedPlan?->pivot?->current_participation_id) {
+                return (int) $loadedPlan->pivot->current_participation_id;
+            }
+        }
+
+        $value = $this->readingPlans()
+            ->where('reading_plan_id', $planId)
+            ->value('user_reading_plans.current_participation_id');
+
+        return $value ? (int) $value : null;
+    }
+
+    public function currentActiveParticipation(): ?ReadingPlanParticipation
+    {
+        $activePlan = $this->activeReadingPlan();
+
+        if (! $activePlan || ! $activePlan->pivot?->current_participation_id) {
+            return null;
+        }
+
+        return ReadingPlanParticipation::query()->find($activePlan->pivot->current_participation_id);
     }
 
     public function activeReadingPlan(): ?ReadingPlan
@@ -228,6 +303,22 @@ class User extends Authenticatable
     public function canManageHierarchy()
     {
         return $this->isLeader() || $this->isAdmin();
+    }
+
+    public function unreadInboxCount(): int
+    {
+        return $this->receivedMessageRecipients()
+            ->whereNull('read_at')
+            ->count();
+    }
+
+    public function messageDeliveryPreferenceLabel(): ?string
+    {
+        if (! $this->message_delivery_preference) {
+            return null;
+        }
+
+        return self::messageDeliveryOptions()[$this->message_delivery_preference] ?? null;
     }
 
     /**

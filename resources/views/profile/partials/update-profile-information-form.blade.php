@@ -47,6 +47,27 @@
             @endif
         </div>
 
+        <div>
+            <x-input-label for="message_delivery_preference" :value="__('Message Delivery Preference')" />
+            <select
+                id="message_delivery_preference"
+                name="message_delivery_preference"
+                class="mt-1 block w-full rounded-xl border-gray-300"
+                {{ $user->message_delivery_preference_locked ? 'disabled' : '' }}
+            >
+                <option value="">{{ __('Use admin default') }}</option>
+                @foreach(\App\Models\User::messageDeliveryOptions() as $value => $label)
+                    <option value="{{ $value }}" {{ old('message_delivery_preference', $user->message_delivery_preference) === $value ? 'selected' : '' }}>
+                        {{ $label }}
+                    </option>
+                @endforeach
+            </select>
+            @if($user->message_delivery_preference_locked)
+                <p class="mt-2 text-sm text-gray-500">{{ __('Your delivery preference is locked by an administrator.') }}</p>
+            @endif
+            <x-input-error class="mt-2" :messages="$errors->get('message_delivery_preference')" />
+        </div>
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

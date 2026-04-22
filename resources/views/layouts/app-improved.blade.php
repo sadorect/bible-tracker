@@ -73,7 +73,7 @@
                         </a>
                         @if($user->canManageHierarchy())
                             <a href="{{ route('hierarchy.manage') }}" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition {{ request()->routeIs('hierarchy.manage') ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'text-slate-600 hover:bg-stone-100 hover:text-slate-900' }}">
-                                <i class="fas fa-people-group w-5 text-center"></i>
+                                <i class="fas fa-users w-5 text-center"></i>
                                 Manage Team
                             </a>
                         @endif
