@@ -257,5 +257,120 @@
                 </div>
             </div>
         </section>
+
+        {{-- Site Visit Analytics --}}
+        <section class="space-y-6">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Site Analytics</p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">Visitor activity overview</h2>
+            </div>
+
+            {{-- Summary cards --}}
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total page views</p>
+                    <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($visitAnalytics['total']) }}</p>
+                    <p class="mt-2 text-sm text-slate-500">All time</p>
+                </article>
+                <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Today</p>
+                    <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($visitAnalytics['today']) }}</p>
+                    <p class="mt-2 text-sm text-slate-500">{{ number_format($visitAnalytics['unique_today']) }} unique sessions</p>
+                </article>
+                <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">This week</p>
+                    <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($visitAnalytics['this_week']) }}</p>
+                    <p class="mt-2 text-sm text-slate-500">{{ number_format($visitAnalytics['unique_week']) }} unique sessions</p>
+                </article>
+                <article class="rounded-[1.75rem] bg-white p-5 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">This month</p>
+                    <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($visitAnalytics['this_month']) }}</p>
+                    <p class="mt-2 text-sm text-slate-500">Page views in {{ now()->format('F') }}</p>
+                </article>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]">
+                {{-- 14-day chart --}}
+                <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Daily traffic</p>
+                    <h3 class="mt-2 text-xl font-semibold text-slate-900">Last 14 days</h3>
+                    <div class="mt-6" style="height:220px">
+                        <canvas id="visitChart"></canvas>
+                    </div>
+                    @push('scripts')
+                    <script>
+                        (function () {
+                            const labels  = @json($visitSeries->pluck('label'));
+                            const visits  = @json($visitSeries->pluck('visits'));
+                            const unique  = @json($visitSeries->pluck('unique_visitors'));
+
+                            const ctx = document.getElementById('visitChart');
+                            new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels,
+                                    datasets: [
+                                        {
+                                            label: 'Page views',
+                                            data: visits,
+                                            backgroundColor: 'rgba(5, 150, 105, 0.75)',
+                                            borderRadius: 6,
+                                            order: 2,
+                                        },
+                                        {
+                                            label: 'Unique sessions',
+                                            data: unique,
+                                            type: 'line',
+                                            borderColor: '#f59e0b',
+                                            backgroundColor: 'rgba(245,158,11,0.12)',
+                                            pointBackgroundColor: '#f59e0b',
+                                            tension: 0.4,
+                                            fill: true,
+                                            order: 1,
+                                        },
+                                    ],
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { position: 'bottom' } },
+                                    scales: {
+                                        x: { grid: { display: false } },
+                                        y: { beginAtZero: true, ticks: { precision: 0 } },
+                                    },
+                                },
+                            });
+                        })();
+                    </script>
+                    @endpush
+                </div>
+
+                {{-- Top pages --}}
+                <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Top pages</p>
+                    <h3 class="mt-2 text-xl font-semibold text-slate-900">Last 30 days</h3>
+                    <div class="mt-5 space-y-2">
+                        @forelse($topPages as $page)
+                            @php
+                                $path = parse_url($page->url, PHP_URL_PATH) ?: '/';
+                                $maxVisits = $topPages->first()->visits ?: 1;
+                                $pct = round(($page->visits / $maxVisits) * 100);
+                            @endphp
+                            <div>
+                                <div class="flex items-center justify-between text-xs text-slate-600">
+                                    <span class="truncate max-w-[180px]" title="{{ $path }}">{{ $path }}</span>
+                                    <span class="ml-2 flex-shrink-0 font-semibold text-slate-800">{{ number_format($page->visits) }}</span>
+                                </div>
+                                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full bg-emerald-500" style="width:{{ $pct }}%"></div>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="py-6 text-center text-sm text-slate-400">No page view data yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 </x-admin-layout>

@@ -7,6 +7,15 @@
 
     <title>{{ config('app.name', 'Bible Reading Tracker') }}</title>
 
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#059669">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="BibleTracker">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
     <style>[x-cloak]{display:none !important;}</style>
@@ -346,5 +355,22 @@
     </script>
 
     @livewireScripts
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="hidden fixed bottom-4 left-4 right-4 z-50 sm:left-auto sm:right-4 sm:w-80">
+        <div class="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-xl shadow-slate-900/10">
+            <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
+                <i class="fas fa-book-bible text-sm"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-slate-900">Install Bible Tracker</p>
+                <p class="text-xs text-slate-500">Add to your home screen for quick access</p>
+            </div>
+            <div class="flex flex-col gap-1">
+                <button onclick="pwaInstall()" class="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Install</button>
+                <button onclick="document.getElementById('pwa-install-banner').classList.add('hidden')" class="rounded-xl px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-600">Dismiss</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -260,6 +260,22 @@
                 @endif
 
                 {{ $slot }}
+
+                @php($footerVisits = \App\Models\SiteVisit::count())
+                @php($footerTodayVisits = \App\Models\SiteVisit::whereDate('created_at', today())->count())
+                <footer class="mt-10 border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+                    <span class="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                        <span>
+                            <span class="font-semibold text-slate-600">{{ number_format($footerVisits) }}</span> total page views
+                        </span>
+                        <span class="hidden sm:inline text-slate-300">·</span>
+                        <span>
+                            <span class="font-semibold text-slate-600">{{ number_format($footerTodayVisits) }}</span> today
+                        </span>
+                        <span class="hidden sm:inline text-slate-300">·</span>
+                        <span>{{ config('app.name', 'Bible Reading Tracker') }} &copy; {{ date('Y') }}</span>
+                    </span>
+                </footer>
             </main>
         </div>
     </div>

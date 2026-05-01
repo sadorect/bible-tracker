@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ReadingPlan;
 use App\Models\ReadingProgress;
+use App\Models\SiteVisit;
 use App\Models\TrainingResource;
 use App\Models\User;
 use Carbon\Carbon;
@@ -97,6 +98,47 @@ class AdminDashboardController extends Controller
                 ];
             });
 
-        return view('admin.dashboard', compact('stats', 'recentActivity', 'topPerformers', 'popularPlans', 'planSnapshots'));
+        // Site visit analytics
+        $visitAnalytics = [
+            'total'        => SiteVisit::count(),
+            'today'        => SiteVisit::whereDate('created_at', $today)->count(),
+            'this_week'    => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->count(),
+            'this_month'   => SiteVisit::whereMonth('created_at', Carbon::now()->month)->whereYear('created_at', Carbon::now()->year)->count(),
+            'unique_today' => SiteVisit::whereDate('created_at', $today)->distinct('session_id')->count('session_id'),
+            'unique_week'  => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->distinct('session_id')->count('session_id'),
+        ];
+
+        // Top pages (last 30 days)
+        $topPages = SiteVisit::selectRaw('url, COUNT(*) as visits')
+            ->where('created_at', '>=', Carbon::now()->subDays(30))
+            ->groupBy('url')
+            ->orderByDesc('visits')
+            ->limit(8)
+            ->get();
+
+        // Daily visits for the last 14 days
+        $dailyVisits = SiteVisit::selectRaw('DATE(created_at) as date, COUNT(*) as visits, COUNT(DISTINCT session_id) as unique_visitors')
+            ->where('created_at', '>=', Carbon::now()->subDays(13)->startOfDay())
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->keyBy('date');
+
+        // Build a complete 14-day series (fill gaps with 0)
+        $visitSeries = collect();
+        for ($i = 13; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i)->toDateString();
+            $visitSeries->push([
+                'date'            => $date,
+                'label'           => Carbon::parse($date)->format('M j'),
+                'visits'          => $dailyVisits->get($date)?->visits ?? 0,
+                'unique_visitors' => $dailyVisits->get($date)?->unique_visitors ?? 0,
+            ]);
+        }
+
+        return view('admin.dashboard', compact(
+            'stats', 'recentActivity', 'topPerformers', 'popularPlans', 'planSnapshots',
+            'visitAnalytics', 'topPages', 'visitSeries'
+        ));
     }
 }
