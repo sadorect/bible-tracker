@@ -12,8 +12,7 @@ class LeaderMemberRecordController extends Controller
 {
     public function __construct(
         private readonly UserProgressSnapshotService $snapshotService,
-    ) {
-    }
+    ) {}
 
     public function show(User $member)
     {

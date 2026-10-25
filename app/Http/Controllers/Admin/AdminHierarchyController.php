@@ -7,8 +7,8 @@ use App\Models\Hierarchy;
 use App\Models\User;
 use App\Services\Auditing\AuditLogger;
 use App\Services\Hierarchy\HierarchyWorkflowService;
-use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -17,8 +17,7 @@ class AdminHierarchyController extends Controller
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly HierarchyWorkflowService $workflowService,
-    ) {
-    }
+    ) {}
 
     private const TYPE_LABELS = [
         'clan' => 'Clan',
@@ -52,7 +51,7 @@ class AdminHierarchyController extends Controller
             ->values();
 
         return view('admin.hierarchies.tree', [
-            'roots'      => $roots,
+            'roots' => $roots,
             'typeLabels' => self::TYPE_LABELS,
             'totalCount' => $all->count(),
         ]);
@@ -82,10 +81,10 @@ class AdminHierarchyController extends Controller
         )->count();
 
         return view('admin.hierarchies.show', [
-            'hierarchy'              => $hierarchy,
-            'children'               => $children,
-            'breadcrumb'             => $breadcrumb,
-            'typeLabels'             => self::TYPE_LABELS,
+            'hierarchy' => $hierarchy,
+            'children' => $children,
+            'breadcrumb' => $breadcrumb,
+            'typeLabels' => self::TYPE_LABELS,
             'totalDescendantMembers' => $totalDescendantMembers,
         ]);
     }
@@ -110,12 +109,24 @@ class AdminHierarchyController extends Controller
         $leaders = User::whereIn('role', User::leaderRoles())
             ->orderBy('name')
             ->get();
-        $promotableUsers = User::query()
+        // Promotion candidates for a group are the people already inside it plus
+        // anyone not yet placed anywhere — a brand new user has no group, so
+        // without the unassigned pool there would be nobody to promote.
+        $currentLeaderIds = $hierarchies->pluck('leader_id')->filter()->values();
+        $candidates = User::query()
             ->whereNotIn('role', [User::ROLE_ADMIN])
             ->whereDoesntHave('systemRoles', fn ($query) => $query->where('slug', 'super_admin'))
+            ->whereNotIn('id', $currentLeaderIds)
             ->orderBy('name')
-            ->get()
-            ->groupBy('hierarchy_id');
+            ->get();
+        $unassignedCandidates = $candidates->whereNull('hierarchy_id')->values();
+        $candidatesByHierarchy = $candidates->whereNotNull('hierarchy_id')->groupBy('hierarchy_id');
+        $promotableUsers = $hierarchies->mapWithKeys(fn (Hierarchy $hierarchy) => [
+            $hierarchy->id => $candidatesByHierarchy
+                ->get($hierarchy->id, collect())
+                ->merge($unassignedCandidates)
+                ->values(),
+        ]);
         $descendantTeams = $this->descendantTeamsByHierarchy($hierarchies);
         $teamBalanceInsights = $this->buildTeamBalanceInsights($hierarchies);
 
@@ -258,9 +269,9 @@ class AdminHierarchyController extends Controller
 
             $candidate = User::query()->findOrFail($validated['promote_user_id']);
 
-            if ((int) $candidate->hierarchy_id !== $hierarchy->id) {
+            if ($candidate->hierarchy_id !== null && (int) $candidate->hierarchy_id !== $hierarchy->id) {
                 throw ValidationException::withMessages([
-                    'promote_user_id' => 'Choose someone already assigned to this hierarchy for direct promotion.',
+                    'promote_user_id' => 'Choose someone already in this group, or a user who has not been placed in a group yet.',
                 ]);
             }
 
@@ -397,10 +408,10 @@ class AdminHierarchyController extends Controller
                 'name' => $validated['name'],
                 'type' => $validated['type'],
                 'parent_id' => $validated['parent_id'],
-                'leader_id' => $leader->id,
+                'leader_id' => $leader?->id,
             ]);
 
-            $leader->update([
+            $leader?->update([
                 'hierarchy_id' => $hierarchy->id,
             ]);
 
@@ -422,7 +433,9 @@ class AdminHierarchyController extends Controller
         }
 
         return redirect()->route('admin.hierarchies.index')
-            ->with('success', 'Hierarchy created and leader assigned successfully.');
+            ->with('success', $leader
+                ? 'Hierarchy created and leader assigned successfully.'
+                : 'Hierarchy created. It is listed as vacant until you assign a leader.');
     }
 
     public function update(Request $request, Hierarchy $hierarchy)
@@ -440,16 +453,16 @@ class AdminHierarchyController extends Controller
             $hierarchy->update([
                 'name' => $validated['name'],
                 'parent_id' => $validated['parent_id'],
-                'leader_id' => $leader->id,
+                'leader_id' => $leader?->id,
             ]);
 
-            if ($previousLeader && $previousLeader->id !== $leader->id && $previousLeader->hierarchy_id === $hierarchy->id) {
+            if ($previousLeader && $previousLeader->id !== $leader?->id && $previousLeader->hierarchy_id === $hierarchy->id) {
                 $previousLeader->update([
                     'hierarchy_id' => null,
                 ]);
             }
 
-            $leader->update([
+            $leader?->update([
                 'hierarchy_id' => $hierarchy->id,
             ]);
         });
@@ -589,30 +602,38 @@ class AdminHierarchyController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:'.implode(',', array_keys(self::TYPE_LABELS))],
             'parent_id' => ['nullable', 'exists:hierarchies,id'],
-            'leader_id' => ['required', 'exists:users,id'],
+            'leader_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $parent = isset($validated['parent_id']) && $validated['parent_id']
             ? Hierarchy::findOrFail($validated['parent_id'])
             : null;
-        $leader = User::findOrFail($validated['leader_id']);
 
-        $expectedRole = $this->expectedLeaderRoleForType($validated['type']);
+        // A group may be created or saved without a leader. The vacancy then
+        // shows up in the vacancy queue and can be filled through promotion,
+        // vacancy resolution, or by assigning the role on the user record.
+        $leader = isset($validated['leader_id']) && $validated['leader_id']
+            ? User::findOrFail($validated['leader_id'])
+            : null;
 
-        if ($leader->role !== $expectedRole) {
-            throw ValidationException::withMessages([
-                'leader_id' => 'The selected leader role does not match this hierarchy type.',
-            ]);
-        }
+        if ($leader) {
+            $expectedRole = $this->expectedLeaderRoleForType($validated['type']);
 
-        $existingLeadership = Hierarchy::where('leader_id', $leader->id)
-            ->when($hierarchy, fn ($query) => $query->where('id', '!=', $hierarchy->id))
-            ->first();
+            if ($leader->role !== $expectedRole) {
+                throw ValidationException::withMessages([
+                    'leader_id' => 'The selected leader role does not match this hierarchy type.',
+                ]);
+            }
 
-        if ($existingLeadership) {
-            throw ValidationException::withMessages([
-                'leader_id' => "{$leader->name} already leads {$existingLeadership->name}.",
-            ]);
+            $existingLeadership = Hierarchy::where('leader_id', $leader->id)
+                ->when($hierarchy, fn ($query) => $query->where('id', '!=', $hierarchy->id))
+                ->first();
+
+            if ($existingLeadership) {
+                throw ValidationException::withMessages([
+                    'leader_id' => "{$leader->name} already leads {$existingLeadership->name}.",
+                ]);
+            }
         }
 
         if ($parent && $hierarchy && $parent->id === $hierarchy->id) {
@@ -661,7 +682,9 @@ class AdminHierarchyController extends Controller
     private function promotableMembersForVacancy(Hierarchy $hierarchy): Collection
     {
         return User::query()
-            ->where('hierarchy_id', $hierarchy->id)
+            ->where(fn ($query) => $query
+                ->where('hierarchy_id', $hierarchy->id)
+                ->orWhereNull('hierarchy_id'))
             ->where('role', '!=', User::ROLE_ADMIN)
             ->whereDoesntHave('systemRoles', fn ($query) => $query->where('slug', 'super_admin'))
             ->orderBy('name')

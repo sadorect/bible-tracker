@@ -10,11 +10,13 @@ use Livewire\WithPagination;
 class UserProgress extends Component
 {
     use WithPagination;
-    
+
     public $selectedPlan = null;
+
     public $readingPlans = [];
+
     public $searchTerm = '';
-    
+
     public function mount()
     {
         $this->readingPlans = ReadingPlan::all();
@@ -22,7 +24,7 @@ class UserProgress extends Component
             $this->selectedPlan = $this->readingPlans->first()->id;
         }
     }
-    
+
     public function render()
     {
         $users = User::query()
@@ -31,45 +33,45 @@ class UserProgress extends Component
             })
             ->when($this->searchTerm, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->searchTerm . '%')
-                      ->orWhere('email', 'like', '%' . $this->searchTerm . '%');
+                    $q->where('name', 'like', '%'.$this->searchTerm.'%')
+                        ->orWhere('email', 'like', '%'.$this->searchTerm.'%');
                 });
             })
             ->with(['readingPlans' => function ($query) {
                 $query->where('reading_plan_id', $this->selectedPlan);
             }])
             ->paginate(10);
-        
+
         return view('livewire.admin.user-progress', [
             'users' => $users,
             'selectedPlanDetails' => ReadingPlan::find($this->selectedPlan),
         ]);
     }
-    
+
     public function sendReminderToAll()
     {
         $plan = ReadingPlan::find($this->selectedPlan);
         $users = User::whereHas('readingPlans', function ($query) {
             $query->where('reading_plan_id', $this->selectedPlan);
         })->get();
-        
+
         // In a real app, you would send notifications here
-        
+
         $this->dispatch('notify', [
             'type' => 'success',
-            'message' => 'Reminders sent to ' . $users->count() . ' users',
+            'message' => 'Reminders sent to '.$users->count().' users',
         ]);
     }
-    
+
     public function sendReminderToUser($userId)
     {
         $user = User::find($userId);
-        
+
         // In a real app, you would send a notification here
-        
+
         $this->dispatch('notify', [
             'type' => 'success',
-            'message' => 'Reminder sent to ' . $user->name,
+            'message' => 'Reminder sent to '.$user->name,
         ]);
     }
 }

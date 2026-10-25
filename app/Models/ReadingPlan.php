@@ -25,6 +25,14 @@ class ReadingPlan extends Model
 
     public const STATUS_ARCHIVED = 'archived';
 
+    public const ENROLLMENT_OPEN = 'open';
+
+    public const ENROLLMENT_SCHEDULED = 'scheduled';
+
+    public const ENROLLMENT_ENDED = 'ended';
+
+    public const ENROLLMENT_UNAVAILABLE = 'unavailable';
+
     public const TYPE_NEW_TESTAMENT = 'new_testament';
 
     public const TYPE_OLD_TESTAMENT = 'old_testament';
@@ -173,13 +181,21 @@ class ReadingPlan extends Model
 
         return $query
             ->publiclyVisible()
-            ->where(function (Builder $inner) use ($at) {
-                $inner->whereNull('enrollment_starts_at')
-                    ->orWhere('enrollment_starts_at', '<=', $at);
-            })
-            ->where(function (Builder $inner) use ($at) {
-                $inner->whereNull('enrollment_ends_at')
-                    ->orWhere('enrollment_ends_at', '>=', $at);
+            ->where(function (Builder $outer) use ($at) {
+                // Recruiting plans are always accepting; the window only
+                // gates the other publicly visible statuses.
+                $outer->where('lifecycle_status', self::STATUS_RECRUITING)
+                    ->orWhere(function (Builder $windowed) use ($at) {
+                        $windowed
+                            ->where(function (Builder $inner) use ($at) {
+                                $inner->whereNull('enrollment_starts_at')
+                                    ->orWhere('enrollment_starts_at', '<=', $at);
+                            })
+                            ->where(function (Builder $inner) use ($at) {
+                                $inner->whereNull('enrollment_ends_at')
+                                    ->orWhere('enrollment_ends_at', '>=', $at);
+                            });
+                    });
             });
     }
 
@@ -352,21 +368,46 @@ class ReadingPlan extends Model
 
     public function acceptsEnrollment(?CarbonInterface $at = null): bool
     {
+        return $this->enrollmentState($at) === self::ENROLLMENT_OPEN;
+    }
+
+    /**
+     * Resolve why enrollment is or is not available, so the UI can tell
+     * "not open yet" apart from "closed".
+     */
+    public function enrollmentState(?CarbonInterface $at = null): string
+    {
         $at = $at ? Carbon::instance($at) : now();
 
         if (! $this->isPubliclyVisible()) {
-            return false;
+            return self::ENROLLMENT_UNAVAILABLE;
+        }
+
+        // An explicit recruiting status is the admin saying "we are taking
+        // sign-ups now"; the window only schedules automatic transitions.
+        if ($this->isRecruiting()) {
+            return self::ENROLLMENT_OPEN;
         }
 
         if ($this->enrollment_starts_at && $at->lt($this->enrollment_starts_at)) {
-            return false;
+            return self::ENROLLMENT_SCHEDULED;
         }
 
         if ($this->enrollment_ends_at && $at->gt($this->enrollment_ends_at)) {
-            return false;
+            return self::ENROLLMENT_ENDED;
         }
 
-        return true;
+        return self::ENROLLMENT_OPEN;
+    }
+
+    public function getEnrollmentStateLabelAttribute(): string
+    {
+        return match ($this->enrollmentState()) {
+            self::ENROLLMENT_OPEN => 'Open now',
+            self::ENROLLMENT_SCHEDULED => 'Opens '.$this->enrollment_starts_at->format('M d, Y g:i A'),
+            self::ENROLLMENT_ENDED => 'Closed '.$this->enrollment_ends_at->format('M d, Y g:i A'),
+            default => 'Not accepting enrollments',
+        };
     }
 
     public function isTrainingCompleteFor(User $user): bool

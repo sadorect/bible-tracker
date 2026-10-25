@@ -17,19 +17,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
-        // Generate simple math captcha (login)
-        $a = random_int(1, 9);
-        $b = random_int(1, 9);
-        session([
-            'captcha_login_a' => $a,
-            'captcha_login_b' => $b,
-            'captcha_login_sum' => $a + $b,
-        ]);
-
-        return view('auth.login', [
-            'captchaA' => $a,
-            'captchaB' => $b,
-        ]);
+        return view('auth.login');
     }
 
     /**
@@ -37,28 +25,10 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        // Validate captcha before authentication
-        if (! app()->runningUnitTests()) {
-            $answer = (int) $request->input('captcha_answer');
-            $expected = (int) session('captcha_login_sum');
-            if ($expected === 0 && $expected !== $answer) {
-                return back()
-                    ->withErrors(['captcha_answer' => 'Please answer the math question.'])
-                    ->withInput();
-            }
-            if ($answer !== $expected) {
-                return back()
-                    ->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])
-                    ->withInput();
-            }
-        }
-
+        // Honeypot and CAPTCHA are enforced by LoginRequest::rules().
         $request->authenticate();
 
         $request->session()->regenerate();
-
-        // Invalidate captcha after successful login attempt
-        session()->forget(['captcha_login_a', 'captcha_login_b', 'captcha_login_sum']);
 
         if ($pendingInviteRedirect = ReadingPlanInviteController::pendingInviteRedirectUrl($request)) {
             return redirect()->to($pendingInviteRedirect);

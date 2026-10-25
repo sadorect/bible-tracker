@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\CaptchaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -16,19 +17,7 @@ class PasswordResetLinkController extends Controller
      */
     public function create(): View
     {
-        // Generate simple math captcha (password reset request)
-        $a = random_int(1, 9);
-        $b = random_int(1, 9);
-        session([
-            'captcha_pwreq_a' => $a,
-            'captcha_pwreq_b' => $b,
-            'captcha_pwreq_sum' => $a + $b,
-        ]);
-
-        return view('auth.forgot-password', [
-            'captchaA' => $a,
-            'captchaB' => $b,
-        ]);
+        return view('auth.forgot-password');
     }
 
     /**
@@ -38,24 +27,13 @@ class PasswordResetLinkController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Validate captcha first
-        if (! app()->runningUnitTests()) {
-            $request->validate([
-                'captcha_answer' => ['required', 'integer'],
-            ], [
-                'captcha_answer.required' => 'Please answer the math question.',
-            ]);
-
-            $answer = (int) $request->input('captcha_answer');
-            $expected = (int) session('captcha_pwreq_sum');
-            if ($answer !== $expected) {
-                return back()->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])->withInput();
-            }
-        }
+        $captcha = app(CaptchaService::class);
 
         $request->validate([
+            'website' => $captcha->honeypotRules(),
+            'captcha' => $captcha->validationRules(),
             'email' => ['required', 'email'],
-        ]);
+        ], $captcha->honeypotMessages());
 
         // We will send the password reset link to this user. Once we have attempted
         // to send the link, we will examine the response then see the message we

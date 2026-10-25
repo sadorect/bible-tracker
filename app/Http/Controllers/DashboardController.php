@@ -16,8 +16,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -160,6 +159,7 @@ class DashboardController extends Controller
                 'statusOptions' => [],
                 'allMemberSnapshots' => collect(),
                 'allowedPerPage' => [25, 50, 100],
+                'canAssignMembers' => $user->canAssignMembers(),
             ]);
         }
 
@@ -248,7 +248,7 @@ class DashboardController extends Controller
             'statusOptions',
             'allMemberSnapshots',
             'allowedPerPage',
-        ));
+        ) + ['canAssignMembers' => $user->canAssignMembers()]);
     }
 
     public function updateManagedMember(Request $request, User $member)
@@ -256,6 +256,10 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         abort_unless($user->canManageHierarchy(), 403);
+
+        // Reassignment is an upper-management action: batch leaders and above.
+        // A team leader can monitor their team but cannot move members in or out.
+        abort_unless($user->canAssignMembers(), 403);
 
         $leadHierarchy = $user->currentLeadershipHierarchy();
 
@@ -266,7 +270,14 @@ class DashboardController extends Controller
         $manageableTeamIds = $manageableTeams->pluck('id')->all();
 
         abort_unless($member->role === User::ROLE_MEMBER, 403);
-        abort_unless($member->hierarchy_id === null || $scopeHierarchyIds->contains($member->hierarchy_id), 403);
+
+        // A member counts as unplaced when they have no group, or point at a group
+        // row that no longer exists. Those may be claimed into this branch; anyone
+        // already placed must already be inside it.
+        $memberIsPlaced = $member->hierarchy_id !== null
+            && Hierarchy::query()->whereKey($member->hierarchy_id)->exists();
+
+        abort_unless(! $memberIsPlaced || $scopeHierarchyIds->contains($member->hierarchy_id), 403);
 
         $validated = $request->validate([
             'hierarchy_id' => ['required', Rule::in($manageableTeamIds)],
@@ -288,7 +299,7 @@ class DashboardController extends Controller
                 'new_hierarchy' => $newHierarchy?->displayPath(),
                 'leader_scope' => $leadHierarchy->displayPath(),
             ],
-            "{$member->name} was reassigned from ".($previousHierarchy?->displayPath() ?? 'Unassigned')." to ".($newHierarchy?->displayPath() ?? 'Unassigned').'.',
+            "{$member->name} was reassigned from ".($previousHierarchy?->displayPath() ?? 'Unassigned').' to '.($newHierarchy?->displayPath() ?? 'Unassigned').'.',
         );
 
         return redirect()->route('hierarchy.manage')

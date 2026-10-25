@@ -12,12 +12,17 @@ class ReadingPlanParticipation extends Model
     use HasFactory;
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_LEFT = 'left';
+
     public const STATUS_SWITCHED = 'switched';
+
     public const STATUS_RESTARTED = 'restarted';
+
     public const STATUS_COMPLETED = 'completed';
 
     public const SOURCE_DIRECT = 'direct';
+
     public const SOURCE_INVITE = 'invite';
 
     protected $fillable = [

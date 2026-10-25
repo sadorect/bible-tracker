@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Manage members, leaders, and admin access.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Users" eyebrow="People Ops">
 
     <div class="space-y-6">
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -37,9 +31,14 @@
                         <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Directory filters</p>
                         <h2 class="mt-2 text-2xl font-semibold text-slate-900">Narrow the user list quickly</h2>
                     </div>
-                    <a href="{{ route('admin.users.create') }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                        Add new user
-                    </a>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('admin.users.demo-accounts') }}" class="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                            Seeded demo accounts
+                        </a>
+                        <a href="{{ route('admin.users.create') }}" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            Add new user
+                        </a>
+                    </div>
                 </div>
 
                 <form method="GET" action="{{ route('admin.users.index') }}" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
@@ -132,6 +131,8 @@
                         <span class="text-sm font-medium text-slate-700">Action</span>
                         <select name="action" id="bulk-action" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                             <option value="">Select action</option>
+                            <option value="activate">Activate users</option>
+                            <option value="deactivate">Deactivate users</option>
                             <option value="assign_plan">Assign reading plan</option>
                             <option value="remove_plan">Remove reading plan</option>
                             <option value="change_role">Change role</option>
@@ -180,9 +181,12 @@
                             <select name="hierarchy_id" id="bulk-hierarchy" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                                 <option value="">Select group</option>
                                 @foreach($hierarchies as $hierarchy)
-                                    <option value="{{ $hierarchy->id }}">{{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }}</option>
+                                    <option value="{{ $hierarchy->id }}" {{ (string) old('hierarchy_id') === (string) $hierarchy->id ? 'selected' : '' }}>
+                                        {{ $hierarchyDisplayPaths[$hierarchy->id] ?? $hierarchy->name }} ({{ ucfirst($hierarchy->type) }})
+                                    </option>
                                 @endforeach
                             </select>
+                            <p class="mt-2 text-xs text-slate-500">Members can only join a <strong>team</strong>. Leaders must be placed in the group type that matches their role.</p>
                         </label>
                     </div>
 
@@ -208,8 +212,8 @@
         <section
             class="rounded-[2rem] bg-white shadow-xl shadow-slate-900/5"
             data-table-columns="admin-user-directory"
-            data-default-columns='{"role":true,"group":true,"status":false,"plans":false,"completions":false,"joined":false}'
-            data-default-columns-md='{"status":true,"plans":true}'
+            data-default-columns='{"role":true,"group":true,"status":false,"last_online":false,"plans":false,"completions":false,"joined":false}'
+            data-default-columns-md='{"status":true,"plans":true,"last_online":true}'
             data-default-columns-xl='{"completions":true,"joined":true}'
         >
             <div class="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -240,6 +244,10 @@
                                 <label class="flex items-center gap-3 text-sm text-slate-700">
                                     <input type="checkbox" data-column-toggle="status" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                     Status
+                                </label>
+                                <label class="flex items-center gap-3 text-sm text-slate-700">
+                                    <input type="checkbox" data-column-toggle="last_online" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    Last online
                                 </label>
                                 <label class="flex items-center gap-3 text-sm text-slate-700">
                                     <input type="checkbox" data-column-toggle="plans" class="rounded border-slate-300 text-emerald-600 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -273,6 +281,7 @@
                             <th class="px-6 py-4" data-column="role">Role</th>
                             <th class="px-6 py-4" data-column="group">Group</th>
                             <th class="px-6 py-4" data-column="status">Status</th>
+                            <th class="px-6 py-4" data-column="last_online">Last online</th>
                             <th class="px-6 py-4" data-column="plans">Plans</th>
                             <th class="px-6 py-4" data-column="completions">Completions</th>
                             <th class="px-6 py-4" data-column="joined">Joined</th>
@@ -338,6 +347,14 @@
                                         {{ $user->email_verified_at ? 'Active' : 'Inactive' }}
                                     </span>
                                 </td>
+                                <td class="px-6 py-5" data-column="last_online">
+                                    @if($user->last_online)
+                                        <p class="text-sm text-slate-900" title="{{ $user->last_online->format('M d, Y g:ia') }}">{{ $user->last_online->diffForHumans() }}</p>
+                                        <p class="mt-1 text-xs text-slate-400">{{ $user->last_online->format('M d, Y g:ia') }}</p>
+                                    @else
+                                        <span class="text-sm text-slate-400">Never</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-5 text-sm text-slate-600" data-column="plans">
                                     {{ $user->reading_plans_count }}
                                 </td>
@@ -355,6 +372,33 @@
                                         <a href="{{ route('admin.users.edit', $user) }}" class="inline-flex rounded-full bg-sky-100 px-3 py-1.5 text-sky-700 transition hover:bg-sky-200">
                                             Edit
                                         </a>
+                                        @can('impersonate-users')
+                                            @if($user->id !== auth()->id())
+                                                <form method="POST" action="{{ route('admin.users.impersonate', $user) }}" class="inline" onsubmit="return confirm('Sign in as {{ $user->name }}? You will see the app exactly as they do until you return to your own account.')">
+                                                    @csrf
+                                                    <button type="submit" class="inline-flex rounded-full bg-amber-100 px-3 py-1.5 text-amber-800 transition hover:bg-amber-200">
+                                                        Login as
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @endcan
+                                        @if($user->email_verified_at)
+                                            @if($user->id !== auth()->id())
+                                                <form method="POST" action="{{ route('admin.users.deactivate', $user) }}" class="inline" onsubmit="return confirm('Deactivate {{ $user->name }}?')">
+                                                    @csrf
+                                                    <button type="submit" class="inline-flex rounded-full bg-amber-100 px-3 py-1.5 text-amber-700 transition hover:bg-amber-200">
+                                                        Deactivate
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @else
+                                            <form method="POST" action="{{ route('admin.users.activate', $user) }}" class="inline">
+                                                @csrf
+                                                <button type="submit" class="inline-flex rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-700 transition hover:bg-emerald-200">
+                                                    Activate
+                                                </button>
+                                            </form>
+                                        @endif
                                         @if($user->role !== 'admin' || $multipleLegacyAdmins)
                                             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline" onsubmit="return confirm('Are you sure you want to delete this user?')">
                                                 @csrf
@@ -369,7 +413,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-16 text-center text-sm text-slate-500">
+                                <td colspan="10" class="px-6 py-16 text-center text-sm text-slate-500">
                                     No users match the current filters.
                                 </td>
                             </tr>
@@ -471,6 +515,11 @@
                     return;
                 }
 
+                if (action === 'deactivate' && ! confirm(`Deactivate ${selectedCheckboxes.length} user(s)?`)) {
+                    e.preventDefault();
+                    return;
+                }
+
                 if (action === 'assign_hierarchy' && ! document.getElementById('bulk-hierarchy').value) {
                     e.preventDefault();
                     alert('Please choose a group for the selected users.');
@@ -495,7 +544,7 @@
             });
 
             (() => {
-                const initialAction = @json(request('action'));
+                const initialAction = @json(old('action', request('action')));
 
                 if (initialAction) {
                     document.getElementById('bulk-action').value = initialAction;

@@ -56,7 +56,7 @@ php artisan test
 
 ## Production deployment
 
-The full deployment checklist and runbook live in [docs/deployment.md](/home/casper/Developer/bible-reading-tracker/docs/deployment.md).
+The full deployment checklist and runbook live in [docs/deployment.md](docs/deployment.md).
 
 Minimum production requirements:
 

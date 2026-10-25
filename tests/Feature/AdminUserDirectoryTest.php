@@ -11,6 +11,104 @@ class AdminUserDirectoryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_editing_a_user_keeps_existing_reading_plan_enrolment(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_MEMBER]);
+        $plan = \App\Models\ReadingPlan::create([
+            'name' => 'Directory Cohort',
+            'type' => \App\Models\ReadingPlan::TYPE_NEW_TESTAMENT,
+            'lifecycle_status' => \App\Models\ReadingPlan::STATUS_ACTIVE,
+            'description' => 'Directory cohort description',
+            'chapters_per_day' => 9,
+            'streak_days' => 10,
+            'break_days' => 1,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addDays(30)->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $user->readingPlans()->attach($plan->id, [
+            'joined_date' => now()->subDays(3)->toDateString(),
+            'current_day' => 4,
+        ]);
+
+        $response = $this->actingAs($admin)->put(route('admin.users.update', $user), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => null,
+            'reading_plans' => [$plan->id],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('user_reading_plans', [
+            'user_id' => $user->id,
+            'reading_plan_id' => $plan->id,
+            'current_day' => 4,
+        ]);
+    }
+
+    public function test_admin_can_activate_an_inactive_user(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['email_verified_at' => null]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->post(route('admin.users.activate', $user));
+
+        $response->assertRedirect(route('admin.users.index'));
+        $response->assertSessionHas('success');
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertDatabaseHas('audit_logs', ['event' => 'users.activated']);
+    }
+
+    public function test_admin_can_deactivate_an_active_user(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->post(route('admin.users.deactivate', $user));
+
+        $response->assertRedirect(route('admin.users.index'));
+        $this->assertNull($user->fresh()->email_verified_at);
+        $this->assertDatabaseHas('audit_logs', ['event' => 'users.deactivated']);
+    }
+
+    public function test_admin_cannot_deactivate_their_own_account(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->post(route('admin.users.deactivate', $admin));
+
+        $response->assertSessionHas('error');
+        $this->assertNotNull($admin->fresh()->email_verified_at);
+    }
+
+    public function test_admin_can_bulk_activate_users(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $users = User::factory()->count(3)->create(['email_verified_at' => null]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->post(route('admin.users.bulk-action'), [
+                'action' => 'activate',
+                'user_ids' => $users->pluck('id')->all(),
+            ]);
+
+        $response->assertSessionHas('success');
+        $users->each(fn (User $user) => $this->assertNotNull($user->fresh()->email_verified_at));
+    }
+
     public function test_admin_can_change_users_list_page_size(): void
     {
         $admin = User::factory()->create([

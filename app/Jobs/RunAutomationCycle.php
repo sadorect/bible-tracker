@@ -16,8 +16,7 @@ class RunAutomationCycle implements ShouldQueue
         public readonly string $runDate,
         public readonly bool $manual = false,
         public readonly ?int $actorId = null,
-    ) {
-    }
+    ) {}
 
     public function handle(AutomationRunner $automationRunner): void
     {

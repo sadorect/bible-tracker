@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReadingPlanInvite;
+use App\Models\ReadingPlanParticipation;
 use App\Services\ReadingPlanParticipationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,8 +16,7 @@ class ReadingPlanInviteController extends Controller
 
     public function __construct(
         private readonly ReadingPlanParticipationService $participationService,
-    ) {
-    }
+    ) {}
 
     public function show(Request $request, string $token): View
     {
@@ -53,7 +53,7 @@ class ReadingPlanInviteController extends Controller
             $user,
             $invite->readingPlan,
             $invite,
-            \App\Models\ReadingPlanParticipation::SOURCE_INVITE,
+            ReadingPlanParticipation::SOURCE_INVITE,
         );
 
         $request->session()->forget(self::PENDING_SESSION_KEY);

@@ -2,13 +2,9 @@
 
 namespace App\Models;
 
-use App\Models\ReadingPlan;
-use App\Models\BibleChapter;
-use App\Models\ReadingProgress;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DailyReading extends Model
 {
@@ -33,7 +29,7 @@ class DailyReading extends Model
         return $this->belongsTo(ReadingPlan::class);
     }
 
-     /**
+    /**
      * Get the Bible chapters for this daily reading.
      */
     public function bibleChapters()

@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Carbon\Carbon;
-use App\Models\ReadingPlan;
 use App\Models\BibleChapter;
 use App\Models\DailyReading;
 use App\Models\GroupMessage;
+use App\Models\ReadingPlan;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 
 class BibleReadingSeeder extends Seeder
@@ -53,38 +53,39 @@ class BibleReadingSeeder extends Seeder
         'Zephaniah' => 3,
         'Haggai' => 2,
         'Zechariah' => 14,
-        'Malachi' => 4
+        'Malachi' => 4,
     ];
 
     protected $newTestamentBooks = [
-      'Matthew' => 28,
-      'Mark' => 16,
-      'Luke' => 24,
-      'John' => 21,
-      'Acts' => 28,
-      'Romans' => 16,
-      '1 Corinthians' => 16,
-      '2 Corinthians' => 13,
-      'Galatians' => 6,
-      'Ephesians' => 6,
-      'Philippians' => 4,
-      'Colossians' => 4,
-      '1 Thessalonians' => 5,
-      '2 Thessalonians' => 3,
-      '1 Timothy' => 6,
-      '2 Timothy' => 4,
-      'Titus' => 3,
-      'Philemon' => 1,
-      'Hebrews' => 13,
-      'James' => 5,
-      '1 Peter' => 5,
-      '2 Peter' => 3,
-      '1 John' => 5,
-      '2 John' => 1,
-      '3 John' => 1,
-      'Jude' => 1,
-      'Revelation' => 22
-  ];
+        'Matthew' => 28,
+        'Mark' => 16,
+        'Luke' => 24,
+        'John' => 21,
+        'Acts' => 28,
+        'Romans' => 16,
+        '1 Corinthians' => 16,
+        '2 Corinthians' => 13,
+        'Galatians' => 6,
+        'Ephesians' => 6,
+        'Philippians' => 4,
+        'Colossians' => 4,
+        '1 Thessalonians' => 5,
+        '2 Thessalonians' => 3,
+        '1 Timothy' => 6,
+        '2 Timothy' => 4,
+        'Titus' => 3,
+        'Philemon' => 1,
+        'Hebrews' => 13,
+        'James' => 5,
+        '1 Peter' => 5,
+        '2 Peter' => 3,
+        '1 John' => 5,
+        '2 John' => 1,
+        '3 John' => 1,
+        'Jude' => 1,
+        'Revelation' => 22,
+    ];
+
     /**
      * Run the database seeds.
      */
@@ -103,7 +104,7 @@ class BibleReadingSeeder extends Seeder
 
         // Generate daily readings for the plan
         $this->generateDailyReadings($readingPlan);
-        
+
         // Add some sample group messages
         $this->createSampleMessages($readingPlan);
     }
@@ -116,26 +117,26 @@ class BibleReadingSeeder extends Seeder
         $chaptersPerDay = $readingPlan->chapters_per_day;
         $streakDays = $readingPlan->streak_days;
         $breakDays = $readingPlan->break_days;
-        
+
         $totalChapters = array_sum($this->oldTestamentBooks);
-        
+
         // Calculate how many reading days we need (excluding break days)
         $totalReadingDays = ceil($totalChapters / $chaptersPerDay);
-        
+
         // Calculate total days including break days
         $cycleLength = $streakDays + $breakDays;
         $totalCycles = ceil($totalReadingDays / $streakDays);
         $totalDays = $totalCycles * $cycleLength;
-        
+
         $currentBook = array_key_first($this->oldTestamentBooks);
         $currentChapter = 1;
         $dayNumber = 1;
-        
+
         for ($day = 1; $day <= $totalDays; $day++) {
             // Determine if this is a reading day or break day
             $cyclePosition = ($day - 1) % $cycleLength + 1;
             $isBreakDay = $cyclePosition > $streakDays;
-            
+
             if ($isBreakDay) {
                 // Create a break day entry
                 DailyReading::create([
@@ -147,25 +148,26 @@ class BibleReadingSeeder extends Seeder
                     'chapter_end' => 0,
                     'is_break_day' => true,
                 ]);
+
                 continue;
             }
-            
+
             // This is a reading day
             $startBook = $currentBook;
             $startChapter = $currentChapter;
-            
+
             // Calculate end chapter and book
             $chaptersToRead = $chaptersPerDay;
-            
+
             while ($chaptersToRead > 0 && $currentBook) {
                 $bookChapters = $this->oldTestamentBooks[$currentBook];
                 $remainingChaptersInBook = $bookChapters - $currentChapter + 1;
-                
+
                 if ($chaptersToRead >= $remainingChaptersInBook) {
                     // We'll finish this book and move to the next
                     $chaptersToRead -= $remainingChaptersInBook;
                     $currentChapter = 1;
-                    
+
                     // Move to the next book
                     $keys = array_keys($this->oldTestamentBooks);
                     $currentIndex = array_search($currentBook, $keys);
@@ -176,10 +178,10 @@ class BibleReadingSeeder extends Seeder
                     $chaptersToRead = 0;
                 }
             }
-            
+
             $endBook = $currentBook ?: array_key_last($this->oldTestamentBooks);
             $endChapter = $currentBook ? $currentChapter - 1 : $this->oldTestamentBooks[array_key_last($this->oldTestamentBooks)];
-            
+
             // Create the daily reading
             $dailyReading = DailyReading::create([
                 'reading_plan_id' => $readingPlan->id,
@@ -190,17 +192,17 @@ class BibleReadingSeeder extends Seeder
                 'chapter_end' => $endChapter,
                 'is_break_day' => false,
             ]);
-            
+
             // Associate Bible chapters with this daily reading
             $this->associateChaptersWithReading($dailyReading, $startBook, $startChapter, $endBook, $endChapter);
-            
+
             // If we've reached the end of the Bible, break
-            if (!$currentBook) {
+            if (! $currentBook) {
                 break;
             }
         }
     }
-    
+
     /**
      * Create sample group messages
      */
@@ -214,7 +216,7 @@ class BibleReadingSeeder extends Seeder
             'is_admin_message' => true,
             'created_at' => Carbon::now(),
         ]);
-        
+
         GroupMessage::create([
             'reading_plan_id' => $readingPlan->id,
             'user_id' => 1,
@@ -223,7 +225,7 @@ class BibleReadingSeeder extends Seeder
             'is_admin_message' => false,
             'created_at' => Carbon::now()->subDay(),
         ]);
-        
+
         GroupMessage::create([
             'reading_plan_id' => $readingPlan->id,
             'user_id' => 1,
@@ -233,7 +235,7 @@ class BibleReadingSeeder extends Seeder
             'created_at' => Carbon::now()->subDays(2),
         ]);
     }
-    
+
     /**
      * Associate Bible chapters with a daily reading
      */
@@ -243,26 +245,26 @@ class BibleReadingSeeder extends Seeder
         $chaptersToAssociate = [];
         $currentBook = $startBook;
         $currentChapter = $startChapter;
-        
+
         while (true) {
             // Find the Bible chapter
             $bibleChapter = BibleChapter::where('book_name', $currentBook)
                 ->where('chapter_number', $currentChapter)
                 ->where('testament', $testament)
                 ->first();
-                
+
             if ($bibleChapter) {
                 $chaptersToAssociate[] = $bibleChapter->id;
             }
-            
+
             // Check if we've reached the end
             if ($currentBook === $endBook && $currentChapter === $endChapter) {
                 break;
             }
-            
+
             // Move to the next chapter
             $bookChapters = $currentBook === 'old_testament' ? $this->oldTestamentBooks[$currentBook] : $this->newTestamentBooks[$currentBook];
-            
+
             if ($currentChapter < $bookChapters) {
                 // Move to the next chapter in the same book
                 $currentChapter++;
@@ -274,7 +276,7 @@ class BibleReadingSeeder extends Seeder
                 $currentChapter = 1;
             }
         }
-        
+
         // Associate the chapters with the daily reading
         $dailyReading->bibleChapters()->attach($chaptersToAssociate);
     }

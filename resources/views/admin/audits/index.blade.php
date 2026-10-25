@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">Audit Trail</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Track high-value operational changes.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Audit trail" eyebrow="Audit Trail">
 
     <div class="space-y-6">
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

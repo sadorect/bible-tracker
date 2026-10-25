@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReadingPlan;
+use App\Models\ReadingPlanParticipation;
 use App\Models\User;
 use App\Services\ReadingPlanParticipationService;
 use Carbon\Carbon;
@@ -13,8 +14,7 @@ class ReadingPlanController extends Controller
 {
     public function __construct(
         private readonly ReadingPlanParticipationService $participationService,
-    ) {
-    }
+    ) {}
 
     /**
      * Display a listing of the reading plans.
@@ -284,7 +284,9 @@ class ReadingPlanController extends Controller
         }
 
         if (! $readingPlan->acceptsEnrollment()) {
-            return [false, 'Enrollment is currently closed for this reading plan.'];
+            return [false, $readingPlan->enrollmentState() === ReadingPlan::ENROLLMENT_SCHEDULED
+                ? 'Enrollment for this reading plan opens on '.$readingPlan->enrollment_starts_at->format('M d, Y g:i A').'.'
+                : 'Enrollment is currently closed for this reading plan.'];
         }
 
         if ($readingPlan->isOldTestament() && ! $user->hasCompletedPlanType(ReadingPlan::TYPE_NEW_TESTAMENT)) {
@@ -386,7 +388,7 @@ class ReadingPlanController extends Controller
                 'completion_rate' => $requiredDays > 0 ? round(($completedDays / $requiredDays) * 100, 1) : 0,
                 'last_completed_on' => $lastCompletedOn ? Carbon::parse($lastCompletedOn) : null,
                 'duration_days' => $durationDays,
-                'join_source_label' => $participation->join_source === \App\Models\ReadingPlanParticipation::SOURCE_INVITE
+                'join_source_label' => $participation->join_source === ReadingPlanParticipation::SOURCE_INVITE
                     ? 'Invite link'
                     : 'Direct join',
             ];

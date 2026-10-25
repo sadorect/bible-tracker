@@ -15,8 +15,7 @@ class MessageRecipientMail extends Mailable
 
     public function __construct(
         public MessageRecipient $messageRecipient,
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {

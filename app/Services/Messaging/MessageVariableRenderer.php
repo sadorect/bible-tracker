@@ -11,8 +11,7 @@ class MessageVariableRenderer
     public function __construct(
         private readonly HierarchyMessageRoutingService $routingService,
         private readonly UserProgressSnapshotService $snapshotService,
-    ) {
-    }
+    ) {}
 
     public function availableVariables(): array
     {

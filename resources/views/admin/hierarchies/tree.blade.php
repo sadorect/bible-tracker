@@ -1,17 +1,13 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Structure · {{ $totalCount }} groups</p>
-                <h1 class="mt-1 text-2xl font-semibold text-slate-900">Hierarchy tree</h1>
-            </div>
-            <a href="{{ route('admin.hierarchies.index') }}"
-               class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition hover:bg-slate-50">
-                <i class="fas fa-sliders text-slate-400"></i>
-                Manage hierarchies
-            </a>
-        </div>
-    </x-slot>
+<x-admin-layout title="Hierarchy tree" eyebrow="Structure">
+
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p class="text-sm text-slate-500">{{ $totalCount }} groups</p>
+        <a href="{{ route('admin.hierarchies.index') }}"
+           class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition hover:bg-slate-50">
+            <i class="fas fa-sliders text-slate-400"></i>
+            Manage hierarchies
+        </a>
+    </div>
 
     {{-- Expand/collapse control toolbar --}}
     <div class="mb-5 overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-900/5 sm:px-5 sm:py-4">

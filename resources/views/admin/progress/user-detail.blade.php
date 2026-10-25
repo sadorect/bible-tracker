@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Reporting</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">User progress: {{ $user->name }}</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="User progress: {{ $user->name }}" eyebrow="Reporting">
 
     <div class="space-y-6">
         <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-700 text-white shadow-2xl shadow-slate-900/15">

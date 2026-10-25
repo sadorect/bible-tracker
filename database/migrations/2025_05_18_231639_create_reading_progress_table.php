@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('completed_date');
             $table->text('notes')->nullable();
             $table->timestamps();
-            
+
             // Unique constraint to ensure a user can't submit multiple reports for the same daily reading
             $table->unique(['user_id', 'daily_reading_id']);
         });

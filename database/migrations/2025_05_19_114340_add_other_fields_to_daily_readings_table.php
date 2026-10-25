@@ -13,22 +13,22 @@ return new class extends Migration
     {
         if (Schema::hasTable('daily_readings')) {
             Schema::table('daily_readings', function (Blueprint $table) {
-                if (!Schema::hasColumn('daily_readings', 'day_number')) {
+                if (! Schema::hasColumn('daily_readings', 'day_number')) {
                     $table->integer('day_number');
                 }
-                if (!Schema::hasColumn('daily_readings', 'book_start')) {
+                if (! Schema::hasColumn('daily_readings', 'book_start')) {
                     $table->string('book_start');
                 }
-                if (!Schema::hasColumn('daily_readings', 'chapter_start')) {
+                if (! Schema::hasColumn('daily_readings', 'chapter_start')) {
                     $table->integer('chapter_start');
                 }
-                if (!Schema::hasColumn('daily_readings', 'book_end')) {
+                if (! Schema::hasColumn('daily_readings', 'book_end')) {
                     $table->string('book_end');
                 }
-                if (!Schema::hasColumn('daily_readings', 'chapter_end')) {
+                if (! Schema::hasColumn('daily_readings', 'chapter_end')) {
                     $table->integer('chapter_end');
                 }
-                if (!Schema::hasColumn('daily_readings', 'is_break_day')) {
+                if (! Schema::hasColumn('daily_readings', 'is_break_day')) {
                     $table->boolean('is_break_day')->default(false);
                 }
             });

@@ -9,8 +9,7 @@ class UserManualController extends Controller
 {
     public function __construct(
         private readonly UserManualService $manualService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {

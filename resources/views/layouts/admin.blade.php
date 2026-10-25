@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @include('partials.pwa-head')
+
     <title>{{ config('app.name', 'Bible Reading Tracker') }} · Admin</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -174,25 +176,34 @@
 
         <div :class="sidebarCollapsed ? 'lg:pl-24' : 'lg:pl-72'" class="transition-all duration-300 ease-out">
             <header class="sticky top-0 z-30 border-b border-slate-200 bg-slate-100/90 backdrop-blur">
-                <div class="mx-auto flex min-h-20 w-full max-w-screen-2xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <button @click="sidebarOpen = true" class="flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 lg:hidden">
+                {{-- Pages declare their title bar as title/eyebrow attributes on the
+                     admin layout component, so every admin screen renders the same
+                     structure at the same size. --}}
+                @php($pageTitle = $attributes->get('title'))
+                @php($pageEyebrow = $attributes->get('eyebrow'))
+                <div class="mx-auto flex min-h-14 w-full max-w-screen-2xl items-center justify-between gap-2 px-4 py-2.5 sm:min-h-20 sm:gap-3 sm:px-6 sm:py-4 lg:px-8 xl:px-10">
+                    <div class="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                        <button @click="sidebarOpen = true" class="flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 sm:p-3 lg:hidden">
                             <i class="fas fa-bars"></i>
                         </button>
                         <button @click="toggleSidebarCollapse()" class="hidden flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 shadow-sm shadow-slate-900/5 hover:text-slate-900 lg:inline-flex" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
                             <i class="fas" :class="sidebarCollapsed ? 'fa-angles-right' : 'fa-angles-left'"></i>
                         </button>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">Command Center</p>
+                        <div class="min-w-0 flex-1">
                             @isset($header)
-                                <div class="mt-1 min-w-0 text-slate-900">{{ $header }}</div>
+                                <div class="min-w-0 text-slate-900">{{ $header }}</div>
                             @else
-                                <h1 class="text-lg font-semibold text-slate-900">Coordinate the reading movement.</h1>
+                                @if($pageEyebrow)
+                                    <p class="hidden text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 sm:block">{{ $pageEyebrow }}</p>
+                                @endif
+                                <h1 class="truncate text-base font-semibold text-slate-900 sm:mt-0.5 sm:text-xl lg:text-2xl" title="{{ $pageTitle ?? 'Command Center' }}">
+                                    {{ $pageTitle ?? 'Command Center' }}
+                                </h1>
                             @endisset
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-shrink-0 items-center gap-3">
                         <a href="{{ route('dashboard') }}" class="hidden rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:text-slate-900 sm:inline-flex">
                             User dashboard
                         </a>
@@ -246,6 +257,8 @@
                 </div>
             </header>
 
+            @include('partials.impersonation-banner')
+
             <main class="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
                 @if(session('success'))
                     <div class="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-sm shadow-emerald-900/5">
@@ -256,6 +269,23 @@
                 @if(session('error'))
                     <div class="mb-6 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
                         {{ session('error') }}
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="mb-6 rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-800 shadow-sm shadow-sky-900/5">
+                        {{ session('info') }}
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="mb-6 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
+                        <p class="font-semibold">We could not complete that action.</p>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
 

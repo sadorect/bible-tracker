@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Hierarchy;
 use App\Models\Message;
 use App\Models\MessageTemplate;
 use App\Models\ReadingPlan;
 use App\Models\User;
-use App\Support\SchemaCapabilities;
 use App\Services\Messaging\MessageCenterService;
 use App\Services\Messaging\MessageVariableRenderer;
+use App\Support\SchemaCapabilities;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,8 +22,7 @@ class MessageCenterController extends Controller
     public function __construct(
         private readonly MessageCenterService $messageCenter,
         private readonly MessageVariableRenderer $variableRenderer,
-    ) {
-    }
+    ) {}
 
     public function inbox(Request $request): View
     {
@@ -311,9 +311,9 @@ class MessageCenterController extends Controller
         array $selectedRecipientIds,
     ): View {
         $hierarchies = $user->isAdmin()
-            ? \App\Models\Hierarchy::query()->with('parent')->ordered()->get()
+            ? Hierarchy::query()->with('parent')->ordered()->get()
             : ($user->currentLeadershipHierarchy()
-                ? \App\Models\Hierarchy::query()
+                ? Hierarchy::query()
                     ->whereIn('id', $user->currentLeadershipHierarchy()->descendantIdsIncludingSelf())
                     ->with('parent')
                     ->ordered()

@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">Automation</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Configure reminders and lifecycle automation.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Automation" eyebrow="Automation">
 
     <div class="space-y-6">
         <section class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">

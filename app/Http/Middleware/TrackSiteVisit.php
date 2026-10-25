@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\SiteVisit;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrackSiteVisit
@@ -24,6 +25,11 @@ class TrackSiteVisit
         'js', 'css', 'ico', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'woff', 'woff2', 'ttf', 'map',
     ];
 
+    /**
+     * How long a users.last_online stamp stays fresh before it is rewritten.
+     */
+    private const PRESENCE_THROTTLE_SECONDS = 120;
+
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
@@ -32,7 +38,39 @@ class TrackSiteVisit
             $this->record($request);
         }
 
+        $this->stampPresence($request);
+
         return $response;
+    }
+
+    /**
+     * Keep users.last_online current for signed-in users. Unlike the visit log
+     * this covers every request method, and writes go through the query builder
+     * so they never touch updated_at or fire model events.
+     */
+    private function stampPresence(Request $request): void
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return;
+        }
+
+        $lastOnline = $user->last_online;
+
+        if ($lastOnline && $lastOnline->diffInSeconds(now()) < self::PRESENCE_THROTTLE_SECONDS) {
+            return;
+        }
+
+        try {
+            $now = now();
+
+            DB::table('users')->where('id', $user->getKey())->update(['last_online' => $now]);
+
+            $user->setAttribute('last_online', $now)->syncOriginalAttribute('last_online');
+        } catch (\Throwable) {
+            // Presence tracking must never break a request.
+        }
     }
 
     private function shouldTrack(Request $request, Response $response): bool
@@ -49,7 +87,7 @@ class TrackSiteVisit
         }
 
         foreach (self::EXCLUDED_PREFIXES as $prefix) {
-            if (str_starts_with('/' . $path, $prefix)) {
+            if (str_starts_with('/'.$path, $prefix)) {
                 return false;
             }
         }
@@ -67,11 +105,11 @@ class TrackSiteVisit
         try {
             SiteVisit::create([
                 'session_id' => substr(session()->getId(), 0, 64),
-                'url'        => substr($request->fullUrl(), 0, 512),
+                'url' => substr($request->fullUrl(), 0, 512),
                 'ip_address' => $request->ip(),
                 'user_agent' => substr($request->userAgent() ?? '', 0, 512),
-                'user_id'    => auth()->id(),
-                'referrer'   => substr($request->headers->get('referer', ''), 0, 512),
+                'user_id' => auth()->id(),
+                'referrer' => substr($request->headers->get('referer', ''), 0, 512),
             ]);
         } catch (\Throwable) {
             // Never let analytics break the app

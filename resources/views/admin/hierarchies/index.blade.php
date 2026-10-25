@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Structure</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Build and manage the leadership hierarchy.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Hierarchies" eyebrow="Structure">
 
     <div class="space-y-6">
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -148,14 +142,15 @@
 
                         <label class="block">
                             <span class="text-sm font-medium text-slate-700">Leader</span>
-                            <select name="leader_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
-                                <option value="">Select leader</option>
+                            <select name="leader_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                <option value="">Leave vacant for now</option>
                                 @foreach($leaders as $leader)
                                     <option value="{{ $leader->id }}" {{ (string) old('leader_id') === (string) $leader->id ? 'selected' : '' }}>
                                         {{ $leader->name }} · {{ $leader->roleLabel() }}
                                     </option>
                                 @endforeach
                             </select>
+                            <p class="mt-2 text-xs text-slate-500">Only users who already hold the matching leader role appear here. Leave it vacant to create the group first, then assign the leader from the user record or the vacancy queue.</p>
                             @error('leader_id')
                                 <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                             @enderror
@@ -346,7 +341,8 @@
 
                                 <label class="block">
                                     <span class="text-sm font-medium text-slate-700">Leader</span>
-                                    <select name="leader_id" required class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                    <select name="leader_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
+                                        <option value="" {{ old('leader_id', $hierarchy->leader_id) ? '' : 'selected' }}>Vacant — no leader</option>
                                         @foreach($leaders as $leader)
                                             <option value="{{ $leader->id }}" {{ (int) old('leader_id', $hierarchy->leader_id) === $leader->id ? 'selected' : '' }}>
                                                 {{ $leader->name }} · {{ $leader->roleLabel() }}
@@ -383,7 +379,7 @@
                         <div class="mt-6 grid gap-4 border-t border-slate-200 pt-5 lg:grid-cols-2">
                             <div class="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Promotion helper</p>
-                                <p class="mt-2 text-sm text-slate-600">Use this when the hierarchy is vacant and you want to promote someone straight into leadership.</p>
+                                <p class="mt-2 text-sm text-slate-600">Use this when the hierarchy is vacant and you want to promote someone straight into leadership. Candidates are the people already in this group plus anyone not yet placed in a group — promoting gives them the matching leader role and moves them here.</p>
                                 <form method="POST" action="{{ route('admin.hierarchies.promote-leader', $hierarchy) }}" class="mt-4 space-y-3">
                                     @csrf
                                     <label class="block">
@@ -391,7 +387,7 @@
                                         <select name="promote_user_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                             <option value="">Select user</option>
                                             @foreach(($promotableUsers[$hierarchy->id] ?? collect()) as $candidate)
-                                                <option value="{{ $candidate->id }}">{{ $candidate->name }} · {{ $candidate->roleLabel() }}</option>
+                                                <option value="{{ $candidate->id }}">{{ $candidate->name }} · {{ $candidate->roleLabel() }} · {{ $candidate->hierarchy_id ? ($displayPaths[$candidate->hierarchy_id] ?? 'In this group') : 'Unassigned' }}</option>
                                             @endforeach
                                         </select>
                                     </label>

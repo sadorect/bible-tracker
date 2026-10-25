@@ -14,8 +14,7 @@ class ProgressReportScope
 {
     public function __construct(
         private readonly UserProgressSnapshotService $snapshotService,
-    ) {
-    }
+    ) {}
 
     public function isGlobal(User $actor): bool
     {

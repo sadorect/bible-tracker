@@ -8,8 +8,10 @@ use App\Models\ReadingPlan;
 use App\Models\SystemRole;
 use App\Models\User;
 use App\Services\Auditing\AuditLogger;
+use App\Support\DemoAccounts;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
@@ -19,8 +21,7 @@ class AdminUserController extends Controller
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -289,11 +290,21 @@ class AdminUserController extends Controller
             if ($request->has('reading_plans')) {
                 $syncData = [];
                 foreach ($request->reading_plans as $planId) {
-                    // Preserve existing pivot data or set defaults for new plans
+                    // Preserve existing pivot data or set defaults for new plans.
+                    // Only the declared pivot columns are carried over: pivot
+                    // timestamps serialize to ISO-8601 strings that MySQL rejects
+                    // when they are written back into datetime columns.
                     $existingPivot = $user->readingPlans()->where('reading_plans.id', $planId)->first();
-                    $syncData[$planId] = $existingPivot ?
-                        $existingPivot->pivot->toArray() :
-                        ['joined_date' => now()->toDateString(), 'current_day' => 1];
+                    $syncData[$planId] = $existingPivot
+                        ? Arr::only($existingPivot->pivot->getAttributes(), [
+                            'joined_date',
+                            'current_participation_id',
+                            'current_day',
+                            'current_streak',
+                            'completion_rate',
+                            'is_active',
+                        ])
+                        : ['joined_date' => now()->toDateString(), 'current_day' => 1];
                 }
                 $user->readingPlans()->sync($syncData);
             } else {
@@ -323,12 +334,71 @@ class AdminUserController extends Controller
             ->with('success', 'User updated successfully.');
     }
 
+    public function activate(Request $request, User $user)
+    {
+        if ($user->email_verified_at) {
+            return redirect()->back()
+                ->with('error', "{$user->name} is already active.");
+        }
+
+        $this->markActivation($user, true, $request->user());
+
+        return redirect()->back()
+            ->with('success', "{$user->name} is now active.");
+    }
+
+    public function deactivate(Request $request, User $user)
+    {
+        if ($user->is($request->user())) {
+            return redirect()->back()
+                ->with('error', 'You cannot deactivate your own account.');
+        }
+
+        if (! $user->email_verified_at) {
+            return redirect()->back()
+                ->with('error', "{$user->name} is already inactive.");
+        }
+
+        $this->markActivation($user, false, $request->user());
+
+        return redirect()->back()
+            ->with('success', "{$user->name} was deactivated.");
+    }
+
+    /**
+     * Activation is tracked through email_verified_at: an active user counts in
+     * the directory statistics and can be reached by "active only" messaging.
+     */
+    private function markActivation(User $user, bool $active, ?User $actor): void
+    {
+        $user->forceFill([
+            'email_verified_at' => $active ? now() : null,
+        ])->save();
+
+        $this->auditLogger->log(
+            $active ? 'users.activated' : 'users.deactivated',
+            $actor,
+            $user->fresh('hierarchy.parent'),
+            [
+                'role' => $user->role,
+                'hierarchy' => $user->hierarchy?->displayPath(),
+            ],
+            $active
+                ? "Activated {$user->name}."
+                : "Deactivated {$user->name}.",
+        );
+    }
+
     public function destroy(User $user)
     {
         // Prevent deletion of the last admin
         if ($user->role === 'admin' && User::where('role', 'admin')->count() <= 1) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'Cannot delete the last admin user.');
+        }
+
+        if ($blocker = $this->leadershipDeletionBlocker($user)) {
+            return redirect()->route('admin.users.index')->with('error', $blocker);
         }
 
         $user->load('hierarchy.parent');
@@ -351,14 +421,18 @@ class AdminUserController extends Controller
 
     public function bulkAction(Request $request)
     {
+        // The form posts every select, so the inputs an action does not use arrive
+        // empty and ConvertEmptyStringsToNull turns them into nulls. Without
+        // 'nullable' those unused fields would still be run through exists/in and
+        // fail the whole submission.
         $request->validate([
-            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy,distribute_evenly,promote_current_assignment,demote_from_leadership'],
+            'action' => ['required', 'in:delete,assign_plan,remove_plan,change_role,assign_hierarchy,clear_hierarchy,distribute_evenly,promote_current_assignment,demote_from_leadership,activate,deactivate'],
             'user_ids' => ['required', 'array'],
             'user_ids.*' => ['exists:users,id'],
-            'reading_plan_id' => ['required_if:action,assign_plan,remove_plan', 'exists:reading_plans,id'],
-            'role' => ['required_if:action,change_role', 'in:'.implode(',', User::assignableRoles())],
+            'reading_plan_id' => ['required_if:action,assign_plan,remove_plan', 'nullable', 'exists:reading_plans,id'],
+            'role' => ['required_if:action,change_role', 'nullable', 'in:'.implode(',', User::assignableRoles())],
             'hierarchy_id' => ['required_if:action,assign_hierarchy', 'nullable', 'exists:hierarchies,id'],
-            'target_team_ids' => ['required_if:action,distribute_evenly', 'array'],
+            'target_team_ids' => ['required_if:action,distribute_evenly', 'nullable', 'array'],
             'target_team_ids.*' => ['exists:hierarchies,id'],
         ]);
 
@@ -369,8 +443,29 @@ class AdminUserController extends Controller
 
         switch ($request->action) {
             case 'delete':
+                // Check every selection up front: a leader hitting the RESTRICT
+                // constraint half way through would otherwise abort the run with
+                // some accounts already gone.
+                $blockers = $users
+                    ->map(fn (User $candidate) => $this->leadershipDeletionBlocker($candidate))
+                    ->filter()
+                    ->values();
+
+                if ($blockers->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'user_ids' => $blockers->all(),
+                    ]);
+                }
+
+                if ($users->contains(fn (User $candidate) => $candidate->role === User::ROLE_ADMIN)
+                    && User::where('role', User::ROLE_ADMIN)->count() <= $users->where('role', User::ROLE_ADMIN)->count()) {
+                    throw ValidationException::withMessages([
+                        'user_ids' => ['Keep at least one admin account: deselect one of the admins before deleting.'],
+                    ]);
+                }
+
                 $deletedNames = $users->pluck('name')->all();
-                $users->each->delete();
+                DB::transaction(fn () => $users->each->delete());
                 $this->auditLogger->log(
                     'users.bulk_deleted',
                     $request->user(),
@@ -451,9 +546,11 @@ class AdminUserController extends Controller
             case 'assign_hierarchy':
                 DB::transaction(function () use ($users, $selectedHierarchy) {
                     foreach ($users as $user) {
-                        $this->validateHierarchyRoleAlignment($user->role, $selectedHierarchy);
-                        $this->guardAgainstUnsafeLeadershipRemoval($user, $user->role, $selectedHierarchy);
-                        $this->guardAgainstOccupiedLeadershipAssignment($user, $user->role, $selectedHierarchy);
+                        $this->withUserContext($user, function () use ($user, $selectedHierarchy) {
+                            $this->validateHierarchyRoleAlignment($user->role, $selectedHierarchy);
+                            $this->guardAgainstUnsafeLeadershipRemoval($user, $user->role, $selectedHierarchy);
+                            $this->guardAgainstOccupiedLeadershipAssignment($user, $user->role, $selectedHierarchy);
+                        });
 
                         $user->update([
                             'hierarchy_id' => $selectedHierarchy?->id,
@@ -474,6 +571,24 @@ class AdminUserController extends Controller
                     'Moved users into a hierarchy through the directory bulk workflow.',
                 );
                 $message = 'Selected users moved into the chosen group.';
+                break;
+
+            case 'activate':
+                $activated = $users->filter(fn (User $user) => ! $user->email_verified_at);
+                $activated->each(fn (User $user) => $this->markActivation($user, true, $request->user()));
+                $message = $activated->isEmpty()
+                    ? 'Every selected user was already active.'
+                    : "Activated {$activated->count()} user(s).";
+                break;
+
+            case 'deactivate':
+                $deactivated = $users
+                    ->reject(fn (User $user) => $user->is($request->user()))
+                    ->filter(fn (User $user) => (bool) $user->email_verified_at);
+                $deactivated->each(fn (User $user) => $this->markActivation($user, false, $request->user()));
+                $message = $deactivated->isEmpty()
+                    ? 'No selected user could be deactivated.'
+                    : "Deactivated {$deactivated->count()} user(s).";
                 break;
 
             case 'clear_hierarchy':
@@ -636,6 +751,46 @@ class AdminUserController extends Controller
         }
 
         return $longestStreak;
+    }
+
+    /**
+     * hierarchies.leader_id is ON DELETE RESTRICT, so deleting a user who still
+     * leads a group raises a raw integrity-constraint error. Return a readable
+     * explanation instead, or null when the delete is safe.
+     */
+    private function leadershipDeletionBlocker(User $user): ?string
+    {
+        $led = Hierarchy::query()
+            ->where('leader_id', $user->getKey())
+            ->get();
+
+        if ($led->isEmpty()) {
+            return null;
+        }
+
+        $names = $led->map(fn (Hierarchy $hierarchy) => $hierarchy->displayPath())->implode(', ');
+
+        return "{$user->name} still leads {$names}. Assign a replacement leader (or leave the group vacant) before deleting this account.";
+    }
+
+    /**
+     * Run a guard closure and re-throw any validation failure with the user's
+     * name attached, so a bulk run says which member blocked it.
+     */
+    private function withUserContext(User $user, callable $callback): void
+    {
+        try {
+            $callback();
+        } catch (ValidationException $e) {
+            throw ValidationException::withMessages(
+                collect($e->errors())
+                    ->map(fn (array $messages) => array_map(
+                        fn (string $message) => "{$user->name}: {$message}",
+                        $messages,
+                    ))
+                    ->all(),
+            );
+        }
     }
 
     private function validateHierarchyRoleAlignment(string $role, ?Hierarchy $hierarchy): void
@@ -862,5 +1017,103 @@ class AdminUserController extends Controller
             'batch' => User::ROLE_BATCH_LEADER,
             default => User::ROLE_TEAM_LEADER,
         };
+    }
+
+    /**
+     * Review the seeded demo accounts before removing them.
+     */
+    public function demoAccounts(Request $request)
+    {
+        $accounts = DemoAccounts::query()
+            ->withCount(['readingPlans', 'readingProgress'])
+            ->orderBy('role')
+            ->orderBy('email')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('admin.users.demo-accounts', [
+            'accounts' => $accounts,
+            'totalCount' => DemoAccounts::query()->count(),
+            'reservedDomains' => DemoAccounts::RESERVED_DOMAINS,
+            'roleOptions' => User::roleOptions(),
+        ]);
+    }
+
+    /**
+     * Delete every seeded demo account.
+     *
+     * Scoped strictly to reserved example domains so a real member can never be
+     * caught by it, and the acting admin is always excluded.
+     */
+    public function purgeDemoAccounts(Request $request)
+    {
+        $request->validate([
+            'confirm' => ['required', 'accepted'],
+        ]);
+
+        $actor = $request->user();
+
+        $accounts = DemoAccounts::query()
+            ->whereKeyNot($actor->getKey())
+            ->get();
+
+        if ($accounts->isEmpty()) {
+            return redirect()
+                ->route('admin.users.demo-accounts')
+                ->with('info', 'There are no seeded demo accounts left to remove.');
+        }
+
+        $removed = $accounts->map(fn (User $user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+        ])->all();
+
+        DB::transaction(function () use ($accounts) {
+            foreach ($accounts as $user) {
+                // Release any hierarchy this demo account still leads, so the
+                // delete cannot leave a dangling leader_id behind.
+                Hierarchy::where('leader_id', $user->id)->update(['leader_id' => null]);
+                $user->delete();
+            }
+        });
+
+        $this->auditLogger->log(
+            'users.demo_accounts_purged',
+            $actor,
+            null,
+            [
+                'count' => count($removed),
+                'users' => $removed,
+            ],
+            'Deleted the seeded demo accounts from the user directory.',
+        );
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', count($removed).' seeded demo account(s) deleted.');
+    }
+
+    /**
+     * Hold a user on the forced password reset screen until they choose a new one.
+     */
+    public function requirePasswordReset(Request $request, User $user)
+    {
+        if ($user->is($request->user())) {
+            return back()->with('error', 'Use your own profile page to change your password.');
+        }
+
+        $user->forceFill(['force_password_reset' => true])->save();
+
+        $this->auditLogger->log(
+            'users.password_reset_required',
+            $request->user(),
+            $user,
+            [],
+            "Required {$user->name} to choose a new password at next sign-in.",
+        );
+
+        return back()->with('success', "{$user->name} must choose a new password at next sign-in.");
     }
 }

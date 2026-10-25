@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Cohort Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Edit {{ $readingPlan->name }}.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Edit {{ $readingPlan->name }}" eyebrow="Cohort Ops">
 
     <div class="space-y-6">
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -106,7 +100,7 @@
                         <label class="block">
                             <span class="text-sm font-medium text-slate-700">Enrollment opens</span>
                             <input type="datetime-local" name="enrollment_starts_at" value="{{ old('enrollment_starts_at', optional($readingPlan->enrollment_starts_at)->format('Y-m-d\TH:i')) }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
-                            <p class="mt-2 text-xs text-slate-500">Leave blank to allow enrollments as soon as this plan becomes visible.</p>
+                            <p class="mt-2 text-xs text-slate-500">Times are in {{ config('app.timezone') }}. Leave blank to allow enrollments as soon as this plan becomes visible. Plans set to Recruiting always accept enrollments regardless of this window.</p>
                             @error('enrollment_starts_at')
                                 <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                             @enderror
@@ -191,7 +185,16 @@
 
                 @unless($readingPlan->acceptsEnrollment())
                     <div class="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-                        Enrollment links can only be created while the plan is visible and currently accepting enrollments.
+                        @switch($readingPlan->enrollmentState())
+                            @case(App\Models\ReadingPlan::ENROLLMENT_SCHEDULED)
+                                Enrollment for this plan opens on {{ $readingPlan->enrollment_starts_at->format('M d, Y g:i A') }}. Set the status to Recruiting, or clear the enrollment start date, to generate links now.
+                                @break
+                            @case(App\Models\ReadingPlan::ENROLLMENT_ENDED)
+                                Enrollment for this plan closed on {{ $readingPlan->enrollment_ends_at->format('M d, Y g:i A') }}. Extend the enrollment end date, or set the status to Recruiting, to generate links again.
+                                @break
+                            @default
+                                This plan is {{ $readingPlan->lifecycle_status_label }}, so it is not publicly visible. Set the status to Recruiting or Active before generating enrollment links.
+                        @endswitch
                     </div>
                 @endunless
 
@@ -247,7 +250,23 @@
                                 <div class="space-y-2">
                                     <p class="text-sm text-slate-500">Created by {{ $invite->creator?->name ?? 'Unknown' }} on {{ $invite->created_at->format('M d, Y g:i A') }}</p>
                                     <p class="text-sm text-slate-500">Expires {{ $invite->expires_at?->format('M d, Y g:i A') ?? 'Never' }}</p>
-                                    <input type="text" readonly value="{{ $invite->enrollmentUrl() }}" class="w-full rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm shadow-slate-900/5">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" readonly value="{{ $invite->enrollmentUrl() }}" onfocus="this.select()" class="min-w-0 flex-1 rounded-2xl border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm shadow-slate-900/5">
+                                        <button type="button"
+                                                data-copy-link="{{ $invite->enrollmentUrl() }}"
+                                                aria-label="Copy enrollment link"
+                                                title="Copy enrollment link"
+                                                class="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">
+                                            <svg data-copy-icon="idle" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                                                <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                                                <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke-linecap="round"></path>
+                                            </svg>
+                                            <svg data-copy-icon="done" class="hidden h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                                            </svg>
+                                            <span data-copy-label class="hidden sm:inline">Copy</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -475,4 +494,70 @@
             </div>
         </section>
     </div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('click', function (event) {
+                const button = event.target.closest('[data-copy-link]');
+
+                if (! button) {
+                    return;
+                }
+
+                const link = button.dataset.copyLink;
+                const idleIcon = button.querySelector('[data-copy-icon="idle"]');
+                const doneIcon = button.querySelector('[data-copy-icon="done"]');
+                const label = button.querySelector('[data-copy-label]');
+
+                const showCopied = function () {
+                    idleIcon.classList.add('hidden');
+                    doneIcon.classList.remove('hidden');
+
+                    if (label) {
+                        label.textContent = 'Copied';
+                    }
+
+                    button.classList.add('bg-emerald-600', 'hover:bg-emerald-600');
+                    button.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+
+                    clearTimeout(button.dataset.copyTimer);
+                    button.dataset.copyTimer = setTimeout(function () {
+                        idleIcon.classList.remove('hidden');
+                        doneIcon.classList.add('hidden');
+
+                        if (label) {
+                            label.textContent = 'Copy';
+                        }
+
+                        button.classList.remove('bg-emerald-600', 'hover:bg-emerald-600');
+                        button.classList.add('bg-slate-900', 'hover:bg-slate-800');
+                    }, 2000);
+                };
+
+                // Fallback for browsers without the async clipboard API, and for
+                // any non-secure context where navigator.clipboard is undefined.
+                const legacyCopy = function () {
+                    const field = button.parentElement.querySelector('input[type="text"]');
+
+                    if (! field) {
+                        return;
+                    }
+
+                    field.removeAttribute('readonly');
+                    field.select();
+                    field.setSelectionRange(0, link.length);
+                    document.execCommand('copy');
+                    field.setAttribute('readonly', 'readonly');
+                    field.blur();
+                    showCopied();
+                };
+
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(link).then(showCopied).catch(legacyCopy);
+                } else {
+                    legacyCopy();
+                }
+            });
+        </script>
+    @endpush
 </x-admin-layout>

@@ -19,11 +19,27 @@ class ReadingHistory extends Component
 
     public $userPlan;
 
+    /**
+     * Pivot data does not survive Livewire hydration, so the plan's current day
+     * is captured as a scalar at mount and used from then on. Reading it off
+     * $userPlan->pivot silently yielded 0 after any update, emptying the page.
+     */
+    public int $currentDay = 0;
+
     public $participationSummary = [];
 
     public function mount()
     {
         $this->loadUserPlan();
+
+        // Redirect from mount, not render(). Livewire calls ->render() on
+        // whatever render() returns, and a Redirector has no such method, so
+        // bouncing from there raised a BadMethodCallException (500) for every
+        // user without an active plan.
+        if (! $this->userPlan) {
+            return $this->redirectRoute('reading-plans.index', navigate: false);
+        }
+
         $this->loadReadingHistory();
     }
 
@@ -45,6 +61,8 @@ class ReadingHistory extends Component
         $this->userPlan = $user->readingPlans()
             ->where('user_reading_plans.is_active', true)
             ->first();
+
+        $this->currentDay = (int) ($this->userPlan?->pivot?->current_day ?? 0);
     }
 
     public function loadReadingHistory()
@@ -59,18 +77,18 @@ class ReadingHistory extends Component
         $user = Auth::user();
 
         // Get all daily readings for the user's active plan up to current day
-        $currentDay = $this->userPlan->pivot ? $this->userPlan->pivot->current_day : 0;
-
         $query = DailyReading::where('reading_plan_id', $this->userPlan->id)
-            ->where('day_number', '<=', $currentDay)
+            ->where('day_number', '<=', $this->currentDay)
             ->orderBy('day_number', 'desc');
 
-        // Apply search filter
+        // Apply search filter. Only real columns here: reading_range is an
+        // accessor, and referencing it made MySQL raise "Unknown column".
         if ($this->searchTerm) {
-            $query->where(function ($q) {
-                $q->where('reading_range', 'like', '%'.$this->searchTerm.'%')
-                    ->orWhere('book_start', 'like', '%'.$this->searchTerm.'%')
-                    ->orWhere('book_end', 'like', '%'.$this->searchTerm.'%');
+            $term = '%'.$this->searchTerm.'%';
+
+            $query->where(function ($q) use ($term) {
+                $q->where('book_start', 'like', $term)
+                    ->orWhere('book_end', 'like', $term);
             });
         }
 
@@ -155,11 +173,8 @@ class ReadingHistory extends Component
 
     public function render()
     {
-        // Check if we need to redirect to reading plans if no active plan
-        if (! $this->userPlan) {
-            return redirect()->route('reading-plans.index');
-        }
-
+        // No plan-guard here: mount() already redirected. render() must always
+        // return a view.
         return view('livewire.reading-history')->layout('layouts.app')
             ->with([
                 'readingHistory' => $this->readingHistory,

@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Reporting</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Track reading momentum across the movement.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Progress" eyebrow="Reporting">
 
     <div class="space-y-6">
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">

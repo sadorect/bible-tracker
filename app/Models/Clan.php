@@ -1,8 +1,7 @@
 <?php
+
 namespace App\Models;
 
-use App\Models\User;
-use App\Models\Hierarchy;
 use Illuminate\Database\Eloquent\Model;
 
 class Clan extends Model
@@ -21,7 +20,7 @@ class Clan extends Model
 
     public function getAllMembers()
     {
-        return User::whereIn('hierarchy_id', 
+        return User::whereIn('hierarchy_id',
             $this->platoons()->with('descendants')->get()
                 ->pluck('descendants.*.id')
                 ->flatten()

@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Edit {{ $user->name }}.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Edit {{ $user->name }}" eyebrow="People Ops">
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">

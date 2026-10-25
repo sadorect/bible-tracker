@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Vacancy Resolution</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">{{ $hierarchy->name }}</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="{{ $hierarchy->name }}" eyebrow="Vacancy Resolution">
 
     <div class="space-y-6">
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
@@ -49,7 +43,8 @@
 
             <div class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Promote from within</p>
-                <h2 class="mt-2 text-2xl font-semibold text-slate-900">Promote someone already in the group</h2>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">Promote someone into this group</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-500">Anyone already in this group, plus users who have not been placed in a group yet. Promoting gives them the matching leader role and moves them here.</p>
                 <form method="POST" action="{{ route('admin.hierarchies.resolve-vacancy.submit', $hierarchy) }}" class="mt-6 space-y-4">
                     @csrf
                     <input type="hidden" name="resolution" value="promote">
@@ -59,7 +54,7 @@
                         <select name="promote_user_id" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
                             <option value="">Select person</option>
                             @foreach($promotableMembers as $candidate)
-                                <option value="{{ $candidate->id }}">{{ $candidate->name }} · {{ $candidate->roleLabel() }}</option>
+                                <option value="{{ $candidate->id }}">{{ $candidate->name }} · {{ $candidate->roleLabel() }} · {{ $candidate->hierarchy_id ? 'In this group' : 'Unassigned' }}</option>
                             @endforeach
                         </select>
                         @error('promote_user_id')

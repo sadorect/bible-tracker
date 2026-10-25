@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyReading;
+use App\Models\Hierarchy;
 use App\Models\ReadingPlan;
 use App\Models\ReadingProgress;
 use App\Models\ReportPreset;
@@ -24,8 +25,7 @@ class UserProgressController extends Controller
         private readonly ProgressReportScope $reportScope,
         private readonly UserProgressSnapshotService $snapshotService,
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -302,7 +302,7 @@ class UserProgressController extends Controller
             'user_ids' => $users->pluck('id')->all(),
             'plans' => $plans,
             'hierarchies' => $hierarchies,
-            'hierarchy_display_paths' => \App\Models\Hierarchy::buildDisplayPaths($hierarchies),
+            'hierarchy_display_paths' => Hierarchy::buildDisplayPaths($hierarchies),
             'derived_user_ids' => $derivedUserIds,
             'scope_label' => $this->reportScope->scopeLabel($actor),
         ];

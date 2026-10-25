@@ -18,8 +18,7 @@ class DeliverMessageRecipientEmail implements ShouldQueue
 
     public function __construct(
         public int $messageRecipientId,
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {

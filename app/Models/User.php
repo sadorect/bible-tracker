@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use App\Support\SchemaCapabilities;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Support\SystemAccess;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -107,6 +108,26 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Leadership levels above a team. Only these — and admins — may move a
+     * member between teams; a team leader monitors their team but cannot pull
+     * members into it.
+     */
+    public static function memberAssigningRoles(): array
+    {
+        return [
+            self::ROLE_CLAN_LEADER,
+            self::ROLE_SQUAD_LEADER,
+            self::ROLE_PLATOON_LEADER,
+            self::ROLE_BATCH_LEADER,
+        ];
+    }
+
+    public function canAssignMembers(): bool
+    {
+        return $this->isAdmin() || in_array($this->role, self::memberAssigningRoles(), true);
+    }
+
     public static function hierarchyTypeForRole(string $role): ?string
     {
         return match ($role) {
@@ -143,10 +164,23 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_online' => 'datetime',
             'password' => 'hashed',
             'message_delivery_preference_locked' => 'boolean',
             'notification_preferences' => 'array',
+            'force_password_reset' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether this account is held on the forced password reset screen.
+     *
+     * Deliberately absent from $fillable so it can only be set through an
+     * explicit forceFill by an admin action or the reset flow itself.
+     */
+    public function mustResetPassword(): bool
+    {
+        return (bool) ($this->force_password_reset ?? false);
     }
 
     public function hierarchy()
@@ -353,7 +387,7 @@ class User extends Authenticatable
     public function permissionNames(): array
     {
         if ($this->isAdmin() || $this->hasSystemRole(SystemRole::SUPER_ADMIN)) {
-            return \App\Support\SystemAccess::permissionSlugs();
+            return SystemAccess::permissionSlugs();
         }
 
         return $this->effectiveSystemRoles()

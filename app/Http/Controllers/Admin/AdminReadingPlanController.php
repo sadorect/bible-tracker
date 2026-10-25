@@ -21,8 +21,7 @@ class AdminReadingPlanController extends Controller
     public function __construct(
         private readonly PlanLifecycleSettings $lifecycleSettings,
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     /**
      * Display a listing of the reading plans.
@@ -341,7 +340,11 @@ class AdminReadingPlanController extends Controller
     {
         if (! $readingPlan->acceptsEnrollment()) {
             throw ValidationException::withMessages([
-                'expires_at' => 'Enrollment links can only be created while this plan is currently accepting enrollments.',
+                'expires_at' => match ($readingPlan->enrollmentState()) {
+                    ReadingPlan::ENROLLMENT_SCHEDULED => 'Enrollment opens on '.$readingPlan->enrollment_starts_at->format('M d, Y g:i A').'. Set the status to Recruiting, or clear the enrollment start date, to generate links now.',
+                    ReadingPlan::ENROLLMENT_ENDED => 'Enrollment closed on '.$readingPlan->enrollment_ends_at->format('M d, Y g:i A').'. Extend the enrollment end date, or set the status to Recruiting, to generate links again.',
+                    default => 'This plan is '.$readingPlan->lifecycle_status_label.', so it is not publicly visible. Set the status to Recruiting or Active before generating enrollment links.',
+                },
             ]);
         }
 

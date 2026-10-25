@@ -4,17 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Hierarchy;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class LeaderHierarchyController extends Controller
 {
     private const TYPE_LABELS = [
-        'clan'    => 'Clan',
-        'squad'   => 'Squad',
+        'clan' => 'Clan',
+        'squad' => 'Squad',
         'platoon' => 'Platoon',
-        'batch'   => 'Batch',
-        'team'    => 'Team',
+        'batch' => 'Batch',
+        'team' => 'Team',
     ];
 
     /**
@@ -32,8 +31,8 @@ class LeaderHierarchyController extends Controller
         }
 
         // Load all nodes in this branch (root + descendants) in one query.
-        $allIds    = $root->descendantIdsIncludingSelf();
-        $all       = Hierarchy::with('leader')
+        $allIds = $root->descendantIdsIncludingSelf();
+        $all = Hierarchy::with('leader')
             ->withCount(['children', 'members'])
             ->whereIn('id', $allIds)
             ->get()
@@ -53,10 +52,10 @@ class LeaderHierarchyController extends Controller
 
         // Only show expand/collapse controls for types that exist in this branch.
         $presentTypes = $all->pluck('type')->unique()->values()->toArray();
-        $typeLabels   = collect(self::TYPE_LABELS)->only($presentTypes)->all();
+        $typeLabels = collect(self::TYPE_LABELS)->only($presentTypes)->all();
 
         return view('leader.hierarchies.tree', [
-            'root'       => $root,
+            'root' => $root,
             'typeLabels' => $typeLabels,
             'totalCount' => $all->count(),
         ]);
@@ -73,8 +72,8 @@ class LeaderHierarchyController extends Controller
         $user = Auth::user();
         $root = $this->resolveLeaderRoot($user);
 
-        $segments  = array_values(array_filter(explode('/', $path)));
-        $id        = (int) last($segments);
+        $segments = array_values(array_filter(explode('/', $path)));
+        $id = (int) last($segments);
         $hierarchy = Hierarchy::findOrFail($id);
 
         // Deny access to nodes outside the leader's branch.
@@ -91,8 +90,8 @@ class LeaderHierarchyController extends Controller
             ->get();
 
         // Build breadcrumb up to (but not above) the leader's root.
-        $breadcrumb   = collect();
-        $rootId       = $root->id;
+        $breadcrumb = collect();
+        $rootId = $root->id;
         $currentCrumb = $hierarchy->parent;
         while ($currentCrumb && $currentCrumb->id !== $rootId) {
             $breadcrumb->prepend($currentCrumb);
@@ -110,24 +109,24 @@ class LeaderHierarchyController extends Controller
 
         // Build a map of id => pretty URL for breadcrumb + children links.
         $urlPathMap = [];
-        $pathSoFar  = '';
+        $pathSoFar = '';
         foreach ($breadcrumb as $crumb) {
-            $pathSoFar               .= ($pathSoFar ? '/' : '') . $crumb->type;
-            $urlPathMap[$crumb->id]   = url('/my-hierarchy/' . $pathSoFar . '/' . $crumb->id);
+            $pathSoFar .= ($pathSoFar ? '/' : '').$crumb->type;
+            $urlPathMap[$crumb->id] = url('/my-hierarchy/'.$pathSoFar.'/'.$crumb->id);
         }
-        $currentPath = $pathSoFar . ($pathSoFar ? '/' : '') . $hierarchy->type;
+        $currentPath = $pathSoFar.($pathSoFar ? '/' : '').$hierarchy->type;
         foreach ($children as $child) {
-            $urlPathMap[$child->id] = url('/my-hierarchy/' . $currentPath . '/' . $child->type . '/' . $child->id);
+            $urlPathMap[$child->id] = url('/my-hierarchy/'.$currentPath.'/'.$child->type.'/'.$child->id);
         }
 
         return view('leader.hierarchies.show', [
-            'hierarchy'              => $hierarchy,
-            'root'                   => $root,
-            'children'               => $children,
-            'breadcrumb'             => $breadcrumb,
-            'typeLabels'             => self::TYPE_LABELS,
+            'hierarchy' => $hierarchy,
+            'root' => $root,
+            'children' => $children,
+            'breadcrumb' => $breadcrumb,
+            'typeLabels' => self::TYPE_LABELS,
             'totalDescendantMembers' => $totalDescendantMembers,
-            'urlPathMap'             => $urlPathMap,
+            'urlPathMap' => $urlPathMap,
         ]);
     }
 

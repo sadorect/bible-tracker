@@ -9,40 +9,35 @@
     };
 @endphp
 
-<x-admin-layout>
-    <x-slot name="header">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-                {{-- Breadcrumb --}}
-                <nav class="flex flex-wrap items-center gap-1 text-xs text-slate-500">
-                    <a href="{{ route('admin.hierarchies.tree') }}" class="transition hover:text-slate-800">Tree</a>
-                    @foreach($breadcrumb as $ancestor)
-                        <i class="fas fa-chevron-right text-[9px] text-slate-300"></i>
-                        <a href="{{ route('admin.hierarchies.show', $ancestor) }}" class="transition hover:text-slate-800">{{ $ancestor->name }}</a>
-                    @endforeach
+<x-admin-layout title="{{ $hierarchy->name }}" eyebrow="Structure">
+
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+            {{-- Breadcrumb --}}
+            <nav class="flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                <a href="{{ route('admin.hierarchies.tree') }}" class="transition hover:text-slate-800">Tree</a>
+                @foreach($breadcrumb as $ancestor)
                     <i class="fas fa-chevron-right text-[9px] text-slate-300"></i>
-                    <span class="font-semibold text-slate-800">{{ $hierarchy->name }}</span>
-                </nav>
-                {{-- Title --}}
-                <div class="mt-2 flex flex-wrap items-center gap-3">
-                    <span class="rounded-full px-3 py-1 text-xs font-medium {{ $typeStyle['badge'] }}">
-                        {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }}
-                    </span>
-                    <h1 class="text-2xl font-semibold text-slate-900">{{ $hierarchy->name }}</h1>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <a href="{{ route('admin.hierarchies.tree') }}"
-                   class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-                    <i class="fas fa-sitemap text-slate-400"></i>Tree view
-                </a>
-                <a href="{{ route('admin.hierarchies.index') }}"
-                   class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-                    <i class="fas fa-sliders text-slate-400"></i>Manage
-                </a>
-            </div>
+                    <a href="{{ route('admin.hierarchies.show', $ancestor) }}" class="transition hover:text-slate-800">{{ $ancestor->name }}</a>
+                @endforeach
+                <i class="fas fa-chevron-right text-[9px] text-slate-300"></i>
+                <span class="font-semibold text-slate-800">{{ $hierarchy->name }}</span>
+            </nav>
+            <span class="mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium {{ $typeStyle['badge'] }}">
+                {{ $typeLabels[$hierarchy->type] ?? ucfirst($hierarchy->type) }}
+            </span>
         </div>
-    </x-slot>
+        <div class="flex flex-wrap items-center gap-3">
+            <a href="{{ route('admin.hierarchies.tree') }}"
+               class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+                <i class="fas fa-sitemap text-slate-400"></i>Tree view
+            </a>
+            <a href="{{ route('admin.hierarchies.index') }}"
+               class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
+                <i class="fas fa-sliders text-slate-400"></i>Manage
+            </a>
+        </div>
+    </div>
 
     <div class="space-y-6">
 

@@ -1,22 +1,23 @@
 <?php
 
-use App\Http\Controllers\Admin\AdminDashboardController;
-use App\Http\Controllers\Admin\AdminAutomationController;
-use App\Http\Controllers\Admin\AdminHierarchyController;
 use App\Http\Controllers\Admin\AdminAuditLogController;
+use App\Http\Controllers\Admin\AdminAutomationController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminHierarchyController;
 use App\Http\Controllers\Admin\AdminMessagingSettingsController;
 use App\Http\Controllers\Admin\AdminReadingPlanController;
 use App\Http\Controllers\Admin\AdminSystemRoleController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\UserProgressController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\MessageCenterController;
-use App\Http\Controllers\NotificationCenterController;
 use App\Http\Controllers\LeaderHierarchyController;
 use App\Http\Controllers\LeaderMemberRecordController;
-use App\Http\Controllers\ReadingPlanInviteController;
+use App\Http\Controllers\MessageCenterController;
+use App\Http\Controllers\NotificationCenterController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReadingPlanController;
+use App\Http\Controllers\ReadingPlanInviteController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\UserManualController;
 use App\Http\Middleware\Admin;
@@ -78,6 +79,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/manual/{guide}', [UserManualController::class, 'show'])->name('manual.show');
     Route::post('/enroll/{token}/accept', [ReadingPlanInviteController::class, 'accept'])->name('reading-plan-invites.accept');
 
+    // Ending an impersonation must stay outside the admin gate: while it is
+    // running the session belongs to the impersonated (often non-admin) user.
+    Route::post('/impersonation/stop', [ImpersonationController::class, 'stop'])->name('impersonation.stop');
+
     // Leader hierarchy tree — scoped to the leader's own branch
     Route::get('/my-hierarchy', [LeaderHierarchyController::class, 'tree'])->name('leader.hierarchies.tree');
     Route::get('/my-hierarchy/{path}', [LeaderHierarchyController::class, 'show'])->where('path', '.+')->name('leader.hierarchies.show');
@@ -88,8 +93,17 @@ Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->grou
     Route::get('/', [AdminDashboardController::class, 'index'])->middleware('can:dashboard.view')->name('dashboard');
 
     // User management - URLs: /admin/users/*
+    // Registered before the resource route so "demo-accounts" is not captured
+    // as a {user} parameter by users.show.
+    Route::get('users/demo-accounts', [AdminUserController::class, 'demoAccounts'])->middleware('can:users.manage')->name('users.demo-accounts');
+    Route::delete('users/demo-accounts', [AdminUserController::class, 'purgeDemoAccounts'])->middleware('can:users.manage')->name('users.demo-accounts.purge');
+
     Route::resource('users', AdminUserController::class)->middleware('can:users.manage');
     Route::post('users/bulk-action', [AdminUserController::class, 'bulkAction'])->middleware('can:users.manage')->name('users.bulk-action');
+    Route::post('users/{user}/require-password-reset', [AdminUserController::class, 'requirePasswordReset'])->middleware('can:users.manage')->name('users.require-password-reset');
+    Route::post('users/{user}/activate', [AdminUserController::class, 'activate'])->middleware('can:users.manage')->name('users.activate');
+    Route::post('users/{user}/impersonate', [ImpersonationController::class, 'start'])->middleware('can:impersonate-users')->name('users.impersonate');
+    Route::post('users/{user}/deactivate', [AdminUserController::class, 'deactivate'])->middleware('can:users.manage')->name('users.deactivate');
 
     Route::get('hierarchies', [AdminHierarchyController::class, 'index'])->middleware('can:hierarchies.manage')->name('hierarchies.index');
     Route::get('hierarchies/tree', [AdminHierarchyController::class, 'tree'])->middleware('can:hierarchies.manage')->name('hierarchies.tree');
@@ -151,3 +165,8 @@ Route::middleware(['auth', Admin::class])->prefix('admin')->name('admin.')->grou
 });
 
 require __DIR__.'/auth.php';
+
+// --- AppDash SSO handoff (dashboard.sadorect.com) --- do not edit by hand ---
+Route::get('/_dash/sso', \App\Http\Controllers\DashboardSsoController::class)
+    ->middleware('throttle:10,1')
+    ->name('dashboard.sso');

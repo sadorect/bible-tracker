@@ -35,6 +35,157 @@ class AdminHierarchyManagementTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_hierarchy_without_a_leader(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $response = $this->actingAs($admin)->post(route('admin.hierarchies.store'), [
+            'name' => 'Platoon Alpha',
+            'type' => 'platoon',
+            'leader_id' => null,
+            'parent_id' => null,
+        ]);
+
+        $response->assertRedirect(route('admin.hierarchies.index'));
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('hierarchies', [
+            'name' => 'Platoon Alpha',
+            'type' => 'platoon',
+            'leader_id' => null,
+        ]);
+    }
+
+    public function test_admin_can_fill_a_vacant_group_from_the_user_record(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $platoon = Hierarchy::create([
+            'name' => 'Platoon Alpha',
+            'type' => 'platoon',
+            'leader_id' => null,
+            'parent_id' => null,
+        ]);
+        $member = User::factory()->create(['role' => User::ROLE_MEMBER]);
+
+        $response = $this->actingAs($admin)->put(route('admin.users.update', $member), [
+            'name' => $member->name,
+            'email' => $member->email,
+            'role' => User::ROLE_PLATOON_LEADER,
+            'hierarchy_id' => $platoon->id,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('users', [
+            'id' => $member->id,
+            'role' => User::ROLE_PLATOON_LEADER,
+            'hierarchy_id' => $platoon->id,
+        ]);
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $platoon->id,
+            'leader_id' => $member->id,
+        ]);
+    }
+
+    public function test_admin_can_vacate_a_group_leader_through_the_edit_form(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $squadLeader = User::factory()->create(['role' => User::ROLE_SQUAD_LEADER]);
+        $squad = Hierarchy::create([
+            'name' => 'Squad North',
+            'type' => 'squad',
+            'leader_id' => $squadLeader->id,
+            'parent_id' => null,
+        ]);
+        $squadLeader->update(['hierarchy_id' => $squad->id]);
+
+        $response = $this->actingAs($admin)->put(route('admin.hierarchies.update', $squad), [
+            'name' => 'Squad North',
+            'type' => 'squad',
+            'leader_id' => null,
+            'parent_id' => null,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $squad->id,
+            'leader_id' => null,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $squadLeader->id,
+            'hierarchy_id' => null,
+        ]);
+    }
+
+    public function test_unassigned_user_can_be_promoted_into_a_vacant_group(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $team = Hierarchy::create([
+            'name' => 'Team Greatness',
+            'type' => 'team',
+            'leader_id' => null,
+            'parent_id' => null,
+        ]);
+        $unassigned = User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => null,
+        ]);
+
+        $index = $this->actingAs($admin)->get(route('admin.hierarchies.index'));
+        $index->assertOk();
+        $index->assertViewHas('promotableUsers', fn ($candidates) => $candidates[$team->id]
+            ->pluck('id')
+            ->contains($unassigned->id));
+
+        $response = $this->actingAs($admin)->post(route('admin.hierarchies.promote-leader', $team), [
+            'promote_user_id' => $unassigned->id,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('users', [
+            'id' => $unassigned->id,
+            'role' => User::ROLE_TEAM_LEADER,
+            'hierarchy_id' => $team->id,
+        ]);
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $team->id,
+            'leader_id' => $unassigned->id,
+        ]);
+    }
+
+    public function test_vacancy_resolution_can_promote_an_unassigned_user(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $platoon = Hierarchy::create([
+            'name' => 'Platoon One',
+            'type' => 'platoon',
+            'leader_id' => null,
+            'parent_id' => null,
+        ]);
+        $unassigned = User::factory()->create([
+            'role' => User::ROLE_MEMBER,
+            'hierarchy_id' => null,
+        ]);
+
+        $page = $this->actingAs($admin)->get(route('admin.hierarchies.resolve-vacancy', $platoon));
+        $page->assertOk();
+        $page->assertViewHas('promotableMembers', fn ($members) => $members->pluck('id')->contains($unassigned->id));
+
+        $response = $this->actingAs($admin)->post(route('admin.hierarchies.resolve-vacancy.submit', $platoon), [
+            'resolution' => 'promote',
+            'promote_user_id' => $unassigned->id,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('hierarchies', [
+            'id' => $platoon->id,
+            'leader_id' => $unassigned->id,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $unassigned->id,
+            'role' => User::ROLE_PLATOON_LEADER,
+            'hierarchy_id' => $platoon->id,
+        ]);
+    }
+
     public function test_admin_cannot_assign_wrong_leader_role_to_hierarchy(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

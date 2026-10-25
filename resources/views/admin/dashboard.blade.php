@@ -1,4 +1,4 @@
-<x-admin-layout>
+<x-admin-layout title="Dashboard" eyebrow="Command Center">
     <div class="space-y-6">
         <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-700 text-white shadow-2xl shadow-slate-900/15">
             <div class="grid gap-8 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)] lg:px-10 lg:py-10">

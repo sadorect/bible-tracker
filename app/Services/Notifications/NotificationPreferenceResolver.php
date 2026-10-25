@@ -22,8 +22,7 @@ class NotificationPreferenceResolver
 
     public function __construct(
         private readonly MessagingSettings $messagingSettings,
-    ) {
-    }
+    ) {}
 
     public function deliveryFor(User $user, string $category): string
     {

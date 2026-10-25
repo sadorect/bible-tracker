@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\CaptchaService;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,16 +21,7 @@ class NewPasswordController extends Controller
      */
     public function create(Request $request): View
     {
-        // Generate simple math captcha (password reset form)
-        $a = random_int(1, 9);
-        $b = random_int(1, 9);
-        session([
-            'captcha_pwreset_a' => $a,
-            'captcha_pwreset_b' => $b,
-            'captcha_pwreset_sum' => $a + $b,
-        ]);
-
-        return view('auth.reset-password', ['request' => $request, 'captchaA' => $a, 'captchaB' => $b]);
+        return view('auth.reset-password', ['request' => $request]);
     }
 
     /**
@@ -39,26 +31,15 @@ class NewPasswordController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Validate captcha first
-        if (! app()->runningUnitTests()) {
-            $request->validate([
-                'captcha_answer' => ['required', 'integer'],
-            ], [
-                'captcha_answer.required' => 'Please answer the math question.',
-            ]);
-
-            $answer = (int) $request->input('captcha_answer');
-            $expected = (int) session('captcha_pwreset_sum');
-            if ($answer !== $expected) {
-                return back()->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])->withInput();
-            }
-        }
+        $captcha = app(CaptchaService::class);
 
         $request->validate([
+            'website' => $captcha->honeypotRules(),
+            'captcha' => $captcha->validationRules(),
             'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+        ], $captcha->honeypotMessages());
 
         // Here we will attempt to reset the user's password. If it is successful we
         // will update the password on an actual user model and persist it to the
@@ -69,6 +50,7 @@ class NewPasswordController extends Controller
                 $user->forceFill([
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
+                    'force_password_reset' => false,
                 ])->save();
 
                 event(new PasswordReset($user));

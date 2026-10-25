@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offline — Bible Reading Tracker</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <meta name="theme-color" content="#059669">
+    <style>
+        :root { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding: 1.5rem;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(160deg, #ecfdf5 0%, #f0fdfa 55%, #fffbeb 100%);
+            color: #0f172a;
+        }
+        .card {
+            width: 100%;
+            max-width: 26rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 1.75rem;
+            padding: 2.5rem 1.75rem;
+            box-shadow: 0 20px 40px -24px rgba(6, 95, 70, 0.45);
+            backdrop-filter: blur(8px);
+        }
+        img { width: 88px; height: 88px; }
+        h1 { margin: 1.25rem 0 0.5rem; font-size: 1.375rem; font-weight: 700; }
+        p { margin: 0; color: #475569; line-height: 1.6; font-size: 0.95rem; }
+        button {
+            margin-top: 1.75rem;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font: inherit;
+            font-weight: 600;
+            color: #fff;
+            background: #059669;
+            border: 0;
+            border-radius: 0.9rem;
+            cursor: pointer;
+        }
+        button:hover { background: #047857; }
+        .hint { margin-top: 1rem; font-size: 0.8rem; color: #64748b; }
+        @media (prefers-color-scheme: dark) {
+            body { background: linear-gradient(160deg, #022c22 0%, #042f2e 55%, #0c0a09 100%); color: #e2e8f0; }
+            .card { background: rgba(2, 44, 34, 0.6); border-color: rgba(226, 232, 240, 0.12); }
+            p { color: #94a3b8; }
+            .hint { color: #64748b; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/pwa-icons/icon-192x192.png" alt="Bible Reading Tracker">
+        <h1>You're offline</h1>
+        <p>We couldn't reach the server. Your reading progress is safe — reconnect and it will sync as soon as you're back.</p>
+        <button type="button" onclick="location.reload()">Try again</button>
+        <p class="hint">This page works without a connection.</p>
+    </div>
+    <script>
+        // Retry automatically the moment connectivity returns.
+        window.addEventListener("online", () => location.reload());
+    </script>
+</body>
+</html>

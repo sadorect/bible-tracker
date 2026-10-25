@@ -22,8 +22,7 @@ class AutomationAlertNotification extends Notification implements ShouldQueue
         private readonly string $tone = 'slate',
         private readonly string $category = 'automation',
         private readonly array $extraData = [],
-    ) {
-    }
+    ) {}
 
     public function via(object $notifiable): array
     {

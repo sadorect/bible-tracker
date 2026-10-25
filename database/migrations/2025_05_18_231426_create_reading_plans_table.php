@@ -33,7 +33,7 @@ return new class extends Migration
             $table->integer('current_streak')->default(0);
             $table->float('completion_rate')->default(0);
             $table->timestamps();
-            
+
             // Unique constraint to ensure a user can join a plan only once
             $table->unique(['user_id', 'reading_plan_id']);
         });

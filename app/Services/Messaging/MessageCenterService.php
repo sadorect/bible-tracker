@@ -9,7 +9,6 @@ use App\Models\MessageTemplate;
 use App\Models\User;
 use App\Support\SchemaCapabilities;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,8 +18,7 @@ class MessageCenterService
         private readonly MessageAudienceResolver $audienceResolver,
         private readonly MessagePreferenceResolver $preferenceResolver,
         private readonly MessageVariableRenderer $variableRenderer,
-    ) {
-    }
+    ) {}
 
     public function previewDownwardRecipients(User $sender, array $filters): EloquentCollection
     {

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('daily_reading_id')->constrained()->onDelete('cascade');
             $table->foreignId('bible_chapter_id')->constrained()->onDelete('cascade');
             $table->timestamps();
-            
+
             // Prevent duplicate entries
             $table->unique(['daily_reading_id', 'bible_chapter_id']);
         });

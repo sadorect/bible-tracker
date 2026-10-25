@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Cohort Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Manage reading cohorts and schedule windows.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Reading plans" eyebrow="Cohort Ops">
 
     <div class="space-y-6">
         <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-700 text-white shadow-2xl shadow-slate-900/15">
@@ -129,7 +123,7 @@
                         <div class="rounded-[1.35rem] bg-slate-50 p-4">
                             <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Enrollment</p>
                             <p class="mt-2 text-sm font-semibold text-slate-900">
-                                {{ $plan->acceptsEnrollment() ? 'Open now' : 'Closed now' }}
+                                {{ $plan->enrollment_state_label }}
                             </p>
                         </div>
                         <div class="rounded-[1.35rem] bg-slate-50 p-4">

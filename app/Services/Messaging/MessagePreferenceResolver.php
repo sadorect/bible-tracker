@@ -8,8 +8,7 @@ class MessagePreferenceResolver
 {
     public function __construct(
         private readonly MessagingSettings $settings,
-    ) {
-    }
+    ) {}
 
     public function resolveFor(User $recipient): string
     {

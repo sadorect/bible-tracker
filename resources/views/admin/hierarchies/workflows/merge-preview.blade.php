@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Workflow Review</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">True sibling merge</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="True sibling merge" eyebrow="Workflow Review">
 
     <div class="space-y-6">
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">

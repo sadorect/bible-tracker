@@ -13,8 +13,7 @@ class MessageAudienceResolver
     public function __construct(
         private readonly HierarchyMessageRoutingService $routingService,
         private readonly UserProgressSnapshotService $snapshotService,
-    ) {
-    }
+    ) {}
 
     public function resolveDownwardRecipients(User $sender, array $filters = []): EloquentCollection
     {
@@ -22,7 +21,7 @@ class MessageAudienceResolver
         $branchIds = $this->routingService->downwardHierarchyIdsFor($sender, $selectedHierarchyIds);
 
         if (! $sender->isAdmin() && $branchIds->isEmpty()) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $query = User::query()
@@ -123,7 +122,7 @@ class MessageAudienceResolver
         $participants = $this->threadParticipantIds($threadRoot)->diff([$sender->id])->values();
 
         if ($participants->isEmpty()) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $allowedDownward = $this->resolveDownwardRecipients($sender);

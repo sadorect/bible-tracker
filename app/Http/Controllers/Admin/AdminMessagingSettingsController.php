@@ -20,8 +20,7 @@ class AdminMessagingSettingsController extends Controller
         private readonly MessagingSettings $settings,
         private readonly MessageVariableRenderer $variableRenderer,
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function index(): View
     {

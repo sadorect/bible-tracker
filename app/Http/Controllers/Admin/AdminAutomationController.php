@@ -12,8 +12,7 @@ class AdminAutomationController extends Controller
 {
     public function __construct(
         private readonly AutomationSettings $settings,
-    ) {
-    }
+    ) {}
 
     public function index()
     {

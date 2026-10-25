@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Message Centre</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Messaging settings</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="Messaging settings" eyebrow="Message Centre">
 
     <div class="space-y-6">
         <section class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

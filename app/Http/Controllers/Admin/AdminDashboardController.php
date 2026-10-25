@@ -100,12 +100,12 @@ class AdminDashboardController extends Controller
 
         // Site visit analytics
         $visitAnalytics = [
-            'total'        => SiteVisit::count(),
-            'today'        => SiteVisit::whereDate('created_at', $today)->count(),
-            'this_week'    => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->count(),
-            'this_month'   => SiteVisit::whereMonth('created_at', Carbon::now()->month)->whereYear('created_at', Carbon::now()->year)->count(),
+            'total' => SiteVisit::count(),
+            'today' => SiteVisit::whereDate('created_at', $today)->count(),
+            'this_week' => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->count(),
+            'this_month' => SiteVisit::whereMonth('created_at', Carbon::now()->month)->whereYear('created_at', Carbon::now()->year)->count(),
             'unique_today' => SiteVisit::whereDate('created_at', $today)->distinct('session_id')->count('session_id'),
-            'unique_week'  => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->distinct('session_id')->count('session_id'),
+            'unique_week' => SiteVisit::whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])->distinct('session_id')->count('session_id'),
         ];
 
         // Top pages (last 30 days)
@@ -129,9 +129,9 @@ class AdminDashboardController extends Controller
         for ($i = 13; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i)->toDateString();
             $visitSeries->push([
-                'date'            => $date,
-                'label'           => Carbon::parse($date)->format('M j'),
-                'visits'          => $dailyVisits->get($date)?->visits ?? 0,
+                'date' => $date,
+                'label' => Carbon::parse($date)->format('M j'),
+                'visits' => $dailyVisits->get($date)?->visits ?? 0,
                 'unique_visitors' => $dailyVisits->get($date)?->unique_visitors ?? 0,
             ]);
         }

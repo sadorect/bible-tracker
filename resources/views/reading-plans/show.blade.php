@@ -61,7 +61,7 @@
                     </div>
                     <div class="rounded-[1.35rem] bg-stone-50 px-4 py-4">
                         <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Enrollment</p>
-                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->acceptsEnrollment() ? 'Open now' : 'Closed now' }}</p>
+                        <p class="mt-2 text-sm font-semibold text-slate-900">{{ $readingPlan->enrollment_state_label }}</p>
                     </div>
                 </div>
 

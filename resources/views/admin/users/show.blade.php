@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">People Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">{{ $user->name }}</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="{{ $user->name }}" eyebrow="People Ops">
 
     <div class="space-y-6">
         <section class="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-sky-700 text-white shadow-2xl shadow-slate-900/15">
@@ -28,6 +22,23 @@
                     <a href="{{ route('admin.users.edit', $user) }}" class="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
                         Edit user
                     </a>
+                    @if($user->email_verified_at)
+                        @if($user->id !== auth()->id())
+                            <form method="POST" action="{{ route('admin.users.deactivate', $user) }}" onsubmit="return confirm('Deactivate {{ $user->name }}?')">
+                                @csrf
+                                <button type="submit" class="inline-flex w-full items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
+                                    Deactivate user
+                                </button>
+                            </form>
+                        @endif
+                    @else
+                        <form method="POST" action="{{ route('admin.users.activate', $user) }}">
+                            @csrf
+                            <button type="submit" class="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400">
+                                Activate user
+                            </button>
+                        </form>
+                    @endif
                     <a href="{{ route('admin.users.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15">
                         Back to users
                     </a>

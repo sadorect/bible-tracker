@@ -4,43 +4,25 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ReadingPlanInviteController;
+use App\Services\CaptchaService;
 use Illuminate\Http\Request;
-use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
 class PhoneLoginController extends Controller
 {
     public function showLoginForm()
     {
-        // Generate simple math captcha (phone login)
-        $a = random_int(1, 9);
-        $b = random_int(1, 9);
-        session([
-            'captcha_phone_a' => $a,
-            'captcha_phone_b' => $b,
-            'captcha_phone_sum' => $a + $b,
-        ]);
-
-        return view('auth.phone-login', [
-            'captchaA' => $a,
-            'captchaB' => $b,
-        ]);
+        return view('auth.phone-login');
     }
 
     public function login(Request $request)
     {
-        // Validate captcha first
-        $request->validate([
-            'captcha_answer' => ['required','integer'],
-        ], [
-            'captcha_answer.required' => 'Please answer the math question.',
-        ]);
+        $captcha = app(CaptchaService::class);
 
-        $answer = (int) $request->input('captcha_answer');
-        $expected = (int) session('captcha_phone_sum');
-        if ($answer !== $expected) {
-            return back()->withErrors(['captcha_answer' => 'Incorrect answer to the math question.'])->withInput();
-        }
+        $request->validate([
+            'website' => $captcha->honeypotRules(),
+            'captcha' => $captcha->validationRules(),
+        ], $captcha->honeypotMessages());
 
         $validated = $request->validate([
             'phone_number' => 'required|string|exists:users,phone_number',
@@ -49,8 +31,6 @@ class PhoneLoginController extends Controller
 
         if (Auth::attempt($validated)) {
             $request->session()->regenerate();
-            // clear captcha
-            session()->forget(['captcha_phone_a', 'captcha_phone_b', 'captcha_phone_sum']);
 
             if ($pendingInviteRedirect = ReadingPlanInviteController::pendingInviteRedirectUrl($request)) {
                 return redirect()->to($pendingInviteRedirect);

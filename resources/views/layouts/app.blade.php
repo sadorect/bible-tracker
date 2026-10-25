@@ -7,14 +7,7 @@
 
     <title>{{ config('app.name', 'Bible Reading Tracker') }}</title>
 
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#059669">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="BibleTracker">
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    @include('partials.pwa-head')
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
@@ -231,6 +224,8 @@
                 </div>
             </header>
 
+            @include('partials.impersonation-banner')
+
             <main class="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
                 @if(session('success'))
                     <div class="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-sm shadow-emerald-900/5">
@@ -247,6 +242,17 @@
                 @if(session('info'))
                     <div class="mb-6 rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-800 shadow-sm shadow-sky-900/5">
                         {{ session('info') }}
+                    </div>
+                @endif
+
+                @if($errors->any())
+                    <div class="mb-6 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
+                        <p class="font-semibold">We could not save that.</p>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
 

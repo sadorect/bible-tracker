@@ -291,7 +291,7 @@
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 align-top text-sm text-slate-700">
-                                            @if($snapshot['user']->role === \App\Models\User::ROLE_MEMBER && $manageableTeams->isNotEmpty())
+                                            @if($canAssignMembers && $snapshot['user']->role === \App\Models\User::ROLE_MEMBER && $manageableTeams->isNotEmpty())
                                                 <form method="POST" action="{{ route('hierarchy.members.update', $snapshot['user']) }}" class="space-y-2">
                                                     @csrf
                                                     <select name="hierarchy_id" class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -306,7 +306,15 @@
                                                     </button>
                                                 </form>
                                             @else
-                                                <span class="text-xs text-slate-500">{{ $snapshot['user']->role === \App\Models\User::ROLE_MEMBER ? 'No teams in scope' : 'Leader assignment managed by admin' }}</span>
+                                                <span class="text-xs text-slate-500">
+                                                    @if($snapshot['user']->role !== \App\Models\User::ROLE_MEMBER)
+                                                        Leader assignment managed by admin
+                                                    @elseif(! $canAssignMembers)
+                                                        Assigned by batch level and above
+                                                    @else
+                                                        No teams in scope
+                                                    @endif
+                                                </span>
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 align-top text-sm text-slate-700" data-column="last-completion">

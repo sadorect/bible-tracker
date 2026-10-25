@@ -1,10 +1,4 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Cohort Ops</p>
-            <h1 class="mt-1 text-2xl font-semibold text-slate-900">Create a reading plan.</h1>
-        </div>
-    </x-slot>
+<x-admin-layout title="New reading plan" eyebrow="Cohort Ops">
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section class="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
@@ -122,7 +116,7 @@
                     <label class="block">
                         <span class="text-sm font-medium text-slate-700">Enrollment opens</span>
                         <input type="datetime-local" name="enrollment_starts_at" id="enrollment_starts_at" value="{{ old('enrollment_starts_at') }}" class="mt-2 w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm shadow-slate-900/5 focus:border-emerald-500 focus:bg-white focus:ring-emerald-500">
-                        <p class="mt-2 text-xs text-slate-500">Leave blank to allow enrollments as soon as the plan becomes visible.</p>
+                        <p class="mt-2 text-xs text-slate-500">Times are in {{ config('app.timezone') }}. Leave blank to allow enrollments as soon as the plan becomes visible. Plans set to Recruiting always accept enrollments regardless of this window.</p>
                         @error('enrollment_starts_at')
                             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror

@@ -5,7 +5,6 @@ namespace App\Services\Automation;
 use App\Models\Hierarchy;
 use App\Models\ReadingPlan;
 use App\Models\ReadingProgress;
-use App\Models\SystemRole;
 use App\Models\User;
 use App\Notifications\AutomationAlertNotification;
 use App\Services\Auditing\AuditLogger;
@@ -25,8 +24,7 @@ class AutomationRunner
         private readonly ProgressReportScope $reportScope,
         private readonly AuditLogger $auditLogger,
         private readonly PlanLifecycleSettings $planLifecycleSettings,
-    ) {
-    }
+    ) {}
 
     public function run(?CarbonInterface $today = null, bool $manual = false, ?User $actor = null): array
     {

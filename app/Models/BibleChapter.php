@@ -1,12 +1,12 @@
 <?php
+
 namespace App\Models;
 
-use App\Models\DailyReading;
 use Illuminate\Database\Eloquent\Model;
 
 class BibleChapter extends Model
 {
-     /**
+    /**
      * Get chapters for a specific day and testament
      */
     /**
@@ -26,9 +26,10 @@ class BibleChapter extends Model
             ->where('testament', $testament)
             ->orderBy('id')
             ->get();
-            if ($chapters->isEmpty()) {
-                return 'No readings';
-            }
+        if ($chapters->isEmpty()) {
+            return 'No readings';
+        }
+
         return sprintf(
             '%s %d - %s %d',
             $chapters->first()->book_name,
@@ -52,7 +53,7 @@ class BibleChapter extends Model
         return $this->belongsToMany(DailyReading::class, 'daily_reading_chapters');
     }
 
-     /**
+    /**
      * Get the full name of the chapter (e.g., "Genesis 1")
      */
     public function getFullNameAttribute()
